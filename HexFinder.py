@@ -4,7 +4,9 @@ from utils import find_extreme_points, rotate_contours
 from EasyContour import EasyContour
 import pickle as pkl
 
-HEX_DIMENSIONS = [[0, 17], [39.25, 17], [29.437, 0], [9.812, 0]]
+XCenterOffset = 19.125
+YCenterOffset = 8.5
+HEX_DIMENSIONS = [[0 - XCenterOffset, 17 - YCenterOffset], [39.25 - XCenterOffset, 17 - YCenterOffset], [29.437 - XCenterOffset, 0 - YCenterOffset], [9.812 - XCenterOffset, 0 - YCenterOffset]]
 HEX_DIMENSIONS = EasyContour(HEX_DIMENSIONS)
 HEX_DIMENSIONS = HEX_DIMENSIONS.format([["x", "y", 0], ["x", "y", 0]], np.float32)
 
