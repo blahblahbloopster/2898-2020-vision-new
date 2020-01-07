@@ -70,6 +70,7 @@ class HexFinder:
 
     def solvepnp(self, points):
         points2 = np.array(points, dtype=np.float32)
+
         ret, translation, rotation = cv2.solvePnP(HEX_DIMENSIONS,
                                                   points2, mtx, dist)
         cv2.aruco.drawAxis(self.img_org, mtx, dist, rotation, translation, 20)
