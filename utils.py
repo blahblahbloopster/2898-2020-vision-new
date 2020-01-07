@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from math import sin, cos, radians
+import math
 
 cached = [(45,
            [[cos(radians(45)), -sin(radians(45)), 0],
@@ -19,6 +20,31 @@ def find_extreme_points(cnt):
     topmost = tuple(cnt[cnt[:, :, 1].argmin()][0])
     bottommost = tuple(cnt[cnt[:, :, 1].argmax()][0])
     return leftmost, rightmost, topmost, bottommost
+
+
+def compute_output_values(rotation_vec, translation_vec):
+    # Compute the necessary output distance and angles
+    x = translation_vec[0][0] + 0
+    z = 0 * translation_vec[1][0] + 1 * translation_vec[2][0]
+
+    # distance in the horizontal plane between robot center and target
+    robot_distance = math.sqrt(x**2 + z**2)
+
+    # horizontal angle between robot center line and target
+    robot_to_target_angle = math.atan2(x, z)
+
+    rot, _ = cv2.Rodrigues(rotation_vec)
+    rot_inv = rot.transpose()
+
+    # version if there is not offset for the camera (VERY slightly faster)
+    # pzero_world = numpy.matmul(rot_inv, -tvec)
+
+    # version if camera is offset
+    pzero_world = np.matmul(rot_inv, 0 - translation_vec)
+
+    other_angle = math.atan2(pzero_world[0][0], pzero_world[2][0])
+
+    return robot_distance, robot_to_target_angle, other_angle
 
 
 def rotate_contours(degrees, list_of_points):
