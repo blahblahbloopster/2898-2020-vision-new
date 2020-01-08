@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from utils import find_extreme_points, rotate_contours
+from utils import find_extreme_points, rotate_contours, compute_output_values
 from EasyContour import EasyContour
 import pickle as pkl
 
@@ -22,12 +22,10 @@ class HexFinder:
 
     def update(self):
         contours = self.contours(self.capture_video())
-        corners = []
-        for cnt in contours:
-            corners.append(self.corners(cnt))
-        translation = []
-        for points in corners:
-            translation.append(self.solvepnp(points))
+        corners = self.corners(contours)
+        self.subpixel(corners)
+        translation = self.solvepnp(corners)
+        return translation
 
     def capture_video(self):
         ret, self.img_org = self.camera.read()
@@ -38,48 +36,52 @@ class HexFinder:
         cv2.imshow("thresh", thresh)
         return thresh
 
+    def subpixel(self, corners):
+        subpixels = []
+        for corner in corners:
+            formatted = np.float32(np.reshape(corner, (4, 1, 2)))
+            subpix_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.01)
+            gray = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2GRAY)
+            subpixels.append(cv2.cornerSubPix(gray, formatted, (3, 3), (-1, -1), subpix_criteria))
+        return subpixels
+
     def contours(self, img):
         return cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
 
     def outside_corners(self, contour):
         return find_extreme_points(contour)
 
-    def corners(self, contour):
-        # corner1, corner2 = self.outside_corners(contour)
-        # print(corner1)
-        corners = self.outside_corners(contour)
-        if not corners:
-            return None
-        point1, point2, _, _ = corners
-        # cv2.drawMarker(self.img_org, point1, (255, 0, 0))
-        # cv2.drawMarker(self.img_org, point2, (0, 255, 0))
-        # contour2 = contour.copy()
-        # cv2.drawContours(self.img_org, rotate_contours(45, contour), -1, (255, 0, 0))
-        rotated = rotate_contours(45, contour)
-        point3 = find_extreme_points(rotated)[1]
-        point3 = tuple(rotate_contours(-45, np.array([point3]))[0][0])
+    def corners(self, contours):
+        points = []
+        for contour in contours:
+            corners = self.outside_corners(contour)
+            if not corners:
+                return None
+            point1, point2, _, _ = corners
+            rotated = rotate_contours(45, contour)
+            point3 = find_extreme_points(rotated)[1]
+            point3 = tuple(rotate_contours(-45, np.array([point3]))[0][0])
 
-        rotated = rotate_contours(-45, contour)
-        point4 = find_extreme_points(rotated)[0]
-        point4 = tuple(rotate_contours(45, np.array([point4]))[0][0])
+            rotated = rotate_contours(-45, contour)
+            point4 = find_extreme_points(rotated)[0]
+            point4 = tuple(rotate_contours(45, np.array([point4]))[0][0])
 
-        # cv2.drawMarker(self.img_org, point3, (0, 0, 255))
-        # cv2.drawMarker(self.img_org, point4, (255, 0, 255))
+            cv2.imshow("corners", self.img_org)
+            points.append((point1, point2, point3, point4))
 
-        cv2.imshow("corners", self.img_org)
-
-        return point1, point2, point3, point4
+        return points
 
     def solvepnp(self, points):
-        points2 = np.array(points, dtype=np.float32)
+        angles = []
+        for point in points:
+            points2 = np.array(point, dtype=np.float32)
 
-        ret, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
-                                                  points2, mtx, dist)
-        cv2.aruco.drawAxis(self.img_org, mtx, dist, rotation, translation, 20)
-        # cv2.drawMarker(self.img_org, points[3], (255, 0, 0))
-        # undistorted = cv2.undistort(self.img_org, mtx, dist)
-        cv2.imshow("axis!", self.img_org)
-        # cv2.imshow("undistort", undistorted)
+            ret, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
+                                                      points2, mtx, dist)
+            # cv2.aruco.drawAxis(self.img_org, mtx, dist, rotation, translation, 20)
+            # cv2.imshow("axis!", self.img_org)
+            angles.append(compute_output_values(rotation, translation))
+        return angles
 
 
 finder = HexFinder(cv2.VideoCapture("output.avi"))
