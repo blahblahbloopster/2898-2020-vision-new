@@ -136,6 +136,18 @@ class HexFinder:
 
 finder = HexFinder("output.avi")
 finder.start()
+start = time.time()
+reps = 0
 while True:
-    # print(finder.update())
-    print(finder.update())
+    if reps >= 200:
+        time_per_frame = (time.time() - start) / reps
+        fps = 1 / time_per_frame
+        print("Avg time per frame: %f5, avg fps: %f2  (avg over %d samples)" %
+              (time_per_frame, fps, reps))
+        reps = 0
+        start = time.time()
+    reps += 1
+    gotten = finder.update()
+    if gotten == STOP:
+        finder.kill()
+        break
