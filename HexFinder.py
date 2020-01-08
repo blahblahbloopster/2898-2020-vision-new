@@ -33,7 +33,6 @@ class HexFinder:
             return None
         hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
         thresh = cv2.inRange(hsv, (0, 150, 0), (200, 255, 255))
-        cv2.imshow("thresh", thresh)
         return thresh
 
     def subpixel(self, corners):
@@ -66,7 +65,6 @@ class HexFinder:
             point4 = find_extreme_points(rotated)[0]
             point4 = tuple(rotate_contours(45, np.array([point4]))[0][0])
 
-            cv2.imshow("corners", self.img_org)
             points.append((point1, point2, point3, point4))
 
         return points
