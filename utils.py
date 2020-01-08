@@ -61,21 +61,28 @@ def rotate_contours(degrees, list_of_points):
                            [sin(rads), cos(rads), 0],
                            [0, 0, 1]]
     rotation_matrix = np.array(rotation_matrix)
-    rotated_points = []
-    for point in list_of_points:
-        if type(point) != np.int32:
-            # Convert point to list
-            if type(point) != list:
-                point = np.ndarray.tolist(point)
-            # Append 1 to point for matrix multiplication
-            if len(point) == 1:
-                point = [point[0][0], point[0][1], 1]
-            else:
-                point = [point[0], point[1], 1]
-            # Apply transform
-            multiplied = np.matmul(point, rotation_matrix)
-            rotated_points.append([[multiplied[0], multiplied[1]]])
-    rotated_points = np.array(rotated_points, dtype=np.int32)
+
+    result = np.zeros((len(list_of_points), 1, 3))
+
+    result[:list_of_points.shape[0], :list_of_points.shape[1], :list_of_points.shape[2]] = list_of_points
+    rotated_points = np.matmul(result, rotation_matrix)
+    rotated_points = np.delete(rotated_points, 2, 2)
+    # print(rotated_points)
+    # for point in list_of_points:
+    #     if type(point) != np.int32:
+    #         # Convert point to list
+    #         if type(point) != list:
+    #             point = np.ndarray.tolist(point)
+    #         # Append 1 to point for matrix multiplication
+    #         if len(point) == 1:
+    #             point = [point[0][0], point[0][1], 1]
+    #         else:
+    #             point = [point[0], point[1], 1]
+    #         # Apply transform
+    #         multiplied = np.matmul(point, rotation_matrix)
+    #         rotated_points.append([[multiplied[0], multiplied[1]]])
+
+    rotated_points = np.array(rotated_points, dtype=np.int8)
 
     return rotated_points
 

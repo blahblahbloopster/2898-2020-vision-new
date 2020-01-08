@@ -52,7 +52,7 @@ class HexFinder:
     def __init__(self, camera):
         self.camera = camera
         self.img_org = None
-        self.tasks = [self.capture_video, self.contours, self.corners, self.solvepnp]
+        self.tasks = [self.capture_video, self.contours, self.corners1, self.corners2, self.solvepnp]
         self.times_q = multiprocessing.Queue()
         self.queues = []
         self.queues.append(multiprocessing.Queue())
@@ -126,24 +126,31 @@ class HexFinder:
     def outside_corners(self, contour):
         return find_extreme_points(contour)
 
-    def corners(self, contours):
+    def corners1(self, contours):
         points = []
         for contour in contours:
             corners = self.outside_corners(contour)
             if not corners:
                 return None
             point1, point2, _, _ = corners
+            points.append([point1, point2])
+
+        return points, contours
+
+    def corners2(self, contours):
+        corners, contours = contours
+        for index, contour in enumerate(contours):
             rotated = rotate_contours(45, contour)
             point3 = find_extreme_points(rotated)[1]
-            point3 = tuple(rotate_contours(-45, np.array([point3]))[0][0])
+            point3 = tuple(rotate_contours(-45, np.array([[point3]]))[0][0])
 
             rotated = rotate_contours(-45, contour)
             point4 = find_extreme_points(rotated)[0]
-            point4 = tuple(rotate_contours(45, np.array([point4]))[0][0])
+            point4 = tuple(rotate_contours(45, np.array([[point4]]))[0][0])
 
-            points.append((point1, point2, point3, point4))
-
-        return points
+            corners[index].append(point3)
+            corners[index].append(point4)
+        return corners
 
     def solvepnp(self, points):
         angles = []
