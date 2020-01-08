@@ -24,7 +24,7 @@ class HexFinder:
     def __init__(self, camera):
         self.camera = camera
         self.img_org = None
-        self.tasks = [self.capture_video, self.contours, self.corners, self.subpixel, self.solvepnp]
+        self.tasks = [self.capture_video, self.contours, self.corners, self.solvepnp]
         self.queues = []
         self.queues.append(multiprocessing.Queue())
         for task in self.tasks:
@@ -74,7 +74,7 @@ class HexFinder:
             return STOP
         hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
         thresh = cv2.inRange(hsv, (0, 150, 0), (200, 255, 255))
-        return thresh, self.img_org
+        return thresh
 
     def subpixel(self, corners):
         # print(corners)
@@ -88,15 +88,12 @@ class HexFinder:
         return subpixels
 
     def contours(self, img):
-        img, color = img
-        return cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0], color
+        return cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
 
     def outside_corners(self, contour):
         return find_extreme_points(contour)
 
     def corners(self, contours):
-        img = contours[1]
-        contours = contours[0]
         points = []
         for contour in contours:
             corners = self.outside_corners(contour)
@@ -113,10 +110,9 @@ class HexFinder:
 
             points.append((point1, point2, point3, point4))
 
-        return points, img
+        return points
 
     def solvepnp(self, points):
-        points, img = points
         angles = []
         for point in points:
             points2 = np.array(point, dtype=np.float32)
@@ -126,7 +122,7 @@ class HexFinder:
             # cv2.aruco.drawAxis(self.img_org, mtx, dist, rotation, translation, 20)
             # cv2.imshow("axis!", self.img_org)
             angles.append(compute_output_values(rotation, translation))
-        return angles, img
+        return angles
 
     def kill(self):
         for p in self.processes:
