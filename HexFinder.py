@@ -24,28 +24,27 @@ class HexFinder:
     def __init__(self, camera):
         self.camera = camera
         self.img_org = None
-        self.queues = [
-            multiprocessing.Queue(),  # Input
-            multiprocessing.Queue(),  # Thresh -> contours
-            multiprocessing.Queue(),  # Contours -> corners
-            multiprocessing.Queue(),  # Corners -> subpixel
-            multiprocessing.Queue(),  # Subpixel -> solvepnp
-            multiprocessing.Queue()   # Solvepnp -> out
-        ]
+        self.tasks = [self.capture_video, self.contours, self.corners, self.subpixel, self.solvepnp]
+        self.queues = []
+        self.queues.append(multiprocessing.Queue())
+        for task in self.tasks:
+            self.queues.append(multiprocessing.Queue())
         for i in range(10):
-            self.queues[0].put(None)
-        self.processes = [
-            multiprocessing.Process(target=self.work_function(self.capture_video, self.queues[0], self.queues[1], camera)),
-            multiprocessing.Process(target=self.work_function(self.contours, self.queues[1], self.queues[2])),
-            multiprocessing.Process(target=self.work_function(self.corners, self.queues[2], self.queues[3])),
-            multiprocessing.Process(target=self.work_function(self.subpixel, self.queues[3], self.queues[4])),
-            multiprocessing.Process(target=self.work_function(self.solvepnp, self.queues[4], self.queues[5]))
-        ]
+            self.queues[0].put(0)
+        self.processes = []
+        for index, task in enumerate(self.tasks):
+            camera = camera if index == 0 else False
+            self.processes.append(multiprocessing.Process(
+                target=self.work_function, args=(task, self.queues[index],
+                                                 self.queues[index + 1], camera)
+            ))
+
+    def start(self):
         for p in self.processes:
             p.start()
 
     def update(self):
-        self.queues[0].put(None)
+        self.queues[0].put(0)
         return self.queues[-1].get()
 
     def work_function(self, target, inp_q, out_q, camera=False):
@@ -53,15 +52,18 @@ class HexFinder:
         if camera:
             self.camera = cv2.VideoCapture(camera)
         gotten = None
-        while gotten is not STOP:
-            print("getting")
+        while type(gotten) is not str:
+            # print("getting")
             gotten = inp_q.get()
-            print("gotten")
+            # print("gotten")
             if gotten is None:
                 out_q.put(None)
+                continue
+            if type(gotten) is str:
+                break
             output = target(gotten)
             out_q.put(output)
-        if gotten is STOP:
+        if type(gotten) is str:
             out_q.put(STOP)
             print("Process exiting %s" % target)
             exit()
@@ -72,9 +74,10 @@ class HexFinder:
             return STOP
         hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
         thresh = cv2.inRange(hsv, (0, 150, 0), (200, 255, 255))
-        return thresh
+        return thresh, self.img_org
 
     def subpixel(self, corners):
+        # print(corners)
         corners, img = corners
         subpixels = []
         for corner in corners:
@@ -85,7 +88,8 @@ class HexFinder:
         return subpixels
 
     def contours(self, img):
-        return cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0], img
+        img, color = img
+        return cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0], color
 
     def outside_corners(self, contour):
         return find_extreme_points(contour)
@@ -135,6 +139,7 @@ class HexFinder:
 
 
 finder = HexFinder("output.avi")
+finder.start()
 while True:
     # print(finder.update())
     print(finder.update())
