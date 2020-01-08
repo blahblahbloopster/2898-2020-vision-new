@@ -6,6 +6,7 @@ from utils import find_extreme_points, rotate_contours, compute_output_values
 from EasyContour import EasyContour
 import pickle as pkl
 import multiprocessing
+from pprint import pprint
 
 XCenterOffset = 19.125
 YCenterOffset = 8.5
@@ -19,12 +20,40 @@ with open('imaginary_cam.pkl', 'rb') as f:
     ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 
+times_dict = {}
+times_record = {}
+frame_count = 0
+
+
+def time_it(name, starting=True):
+    # This is a debugging/tracing function.  You use it by putting it around some code you
+    # want to time, like this:
+    """
+    time_it("solvepnp")
+    foo = cv2.solvepnp(arguments blah blah)
+    time_it("solvepnp", False)
+    """
+    # The function will measure the amount of time between the calls and record it.  Processes
+    # will send it back to the main process which will report it.
+    # if not TRACING:
+    #     return
+    if starting:
+        times_dict[name] = time.monotonic()
+    else:
+        if name in times_record:
+            times_record[name]["total"] += time.monotonic() - times_dict[name]
+        else:
+            times_record[name] = {"total": time.monotonic() - times_dict[name],
+                                  "calls": 1}
+
+
 class HexFinder:
 
     def __init__(self, camera):
         self.camera = camera
         self.img_org = None
         self.tasks = [self.capture_video, self.contours, self.corners, self.solvepnp]
+        self.times_q = multiprocessing.Queue()
         self.queues = []
         self.queues.append(multiprocessing.Queue())
         for task in self.tasks:
@@ -36,7 +65,8 @@ class HexFinder:
             camera = camera if index == 0 else False
             self.processes.append(multiprocessing.Process(
                 target=self.work_function, args=(task, self.queues[index],
-                                                 self.queues[index + 1], camera)
+                                                 self.queues[index + 1], self.times_q,
+                                                 camera)
             ))
 
     def start(self):
@@ -47,7 +77,7 @@ class HexFinder:
         self.queues[0].put(0)
         return self.queues[-1].get()
 
-    def work_function(self, target, inp_q, out_q, camera=False):
+    def work_function(self, target, inp_q, out_q, times_q, camera=False):
         print("Initalizing")
         if camera:
             self.camera = cv2.VideoCapture(camera)
@@ -61,10 +91,13 @@ class HexFinder:
                 continue
             if type(gotten) is str:
                 break
+            time_it(str(target))
             output = target(gotten)
+            time_it(str(target), False)
             out_q.put(output)
         if type(gotten) is str:
             out_q.put(STOP)
+            times_q.put(times_record)
             print("Process exiting %s" % target)
             exit()
 
@@ -127,6 +160,10 @@ class HexFinder:
     def kill(self):
         for p in self.processes:
             p.kill()
+        times = {}
+        for t in range(self.times_q.qsize()):
+            times.update(self.times_q.get())
+        pprint(times)
 
     def stop(self):
         self.queues[0].put(STOP)
@@ -149,5 +186,6 @@ while True:
     reps += 1
     gotten = finder.update()
     if gotten == STOP:
-        finder.kill()
         break
+time.sleep(2)
+finder.kill()
