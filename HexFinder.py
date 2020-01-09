@@ -7,6 +7,7 @@ from EasyContour import EasyContour
 import pickle as pkl
 import multiprocessing
 from pprint import pprint
+import os
 
 XCenterOffset = 19.125
 YCenterOffset = 8.5
@@ -50,9 +51,9 @@ def time_it(name, starting=True):
 class HexFinder:
 
     def __init__(self, camera):
-        self.camera = camera
+        self.camera = None
         self.img_org = None
-        self.tasks = [self.capture_video, self.contours, self.corners1, self.corners2, self.solvepnp]
+        self.tasks = [self.capture_video, self.contours, self.corners, self.solvepnp]
         self.times_q = multiprocessing.Queue()
         self.queues = []
         self.queues.append(multiprocessing.Queue())
@@ -78,24 +79,25 @@ class HexFinder:
         return self.queues[-1].get()
 
     def work_function(self, target, inp_q, out_q, times_q, camera=False):
-        print("Initalizing")
+        # print("Initalizing")
+        # print("{}, {}".format(str(target), os.getpid()))
         if camera:
             self.camera = cv2.VideoCapture(camera)
         gotten = None
-        while type(gotten) is not str:
-            # print("getting")
+        output = None
+        name = str(target) if not camera else "camera"
+        while type(gotten) is not str or type(output) is str:
             gotten = inp_q.get()
-            # print("gotten")
             if gotten is None:
                 out_q.put(None)
                 continue
             if type(gotten) is str:
                 break
-            time_it(str(target))
+            time_it(name)
             output = target(gotten)
-            time_it(str(target), False)
+            time_it(name, False)
             out_q.put(output)
-        if type(gotten) is str:
+        if type(gotten) is str or type(output) is str:
             out_q.put(STOP)
             times_q.put(times_record)
             print("Process exiting %s" % target)
@@ -110,7 +112,7 @@ class HexFinder:
         return thresh
 
     def subpixel(self, corners):
-        # print(corners)
+        # Not being used at the moment
         corners, img = corners
         subpixels = []
         for corner in corners:
@@ -126,20 +128,14 @@ class HexFinder:
     def outside_corners(self, contour):
         return find_extreme_points(contour)
 
-    def corners1(self, contours):
+    def corners(self, contours):
         points = []
         for contour in contours:
             corners = self.outside_corners(contour)
             if not corners:
                 return None
             point1, point2, _, _ = corners
-            points.append([point1, point2])
 
-        return points, contours
-
-    def corners2(self, contours):
-        corners, contours = contours
-        for index, contour in enumerate(contours):
             rotated = rotate_contours(45, contour)
             point3 = find_extreme_points(rotated)[1]
             point3 = tuple(rotate_contours(-45, np.array([[point3]]))[0][0])
@@ -148,19 +144,17 @@ class HexFinder:
             point4 = find_extreme_points(rotated)[0]
             point4 = tuple(rotate_contours(45, np.array([[point4]]))[0][0])
 
-            corners[index].append(point3)
-            corners[index].append(point4)
-        return corners
+            points.append((point1, point2, point3, point4))
+
+        return points
 
     def solvepnp(self, points):
         angles = []
         for point in points:
             points2 = np.array(point, dtype=np.float32)
 
-            ret, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
+            got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
                                                       points2, mtx, dist)
-            # cv2.aruco.drawAxis(self.img_org, mtx, dist, rotation, translation, 20)
-            # cv2.imshow("axis!", self.img_org)
             angles.append(compute_output_values(rotation, translation))
         return angles
 
@@ -182,6 +176,7 @@ finder = HexFinder("output.avi")
 finder.start()
 start = time.time()
 reps = 0
+print("Main pid: %s" % os.getpid())
 while True:
     if reps >= 200:
         time_per_frame = (time.time() - start) / reps
