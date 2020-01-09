@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import numpy as np
 from utils import find_extreme_points, rotate_contours, compute_output_values
@@ -82,9 +84,19 @@ class HexFinder:
         return angles
 
 
+start = time.time()
+reps = 0
 finder = HexFinder(cv2.VideoCapture("output.avi"))
 while True:
     # print(finder.update())
+    if reps >= 200:
+        time_per_frame = (time.time() - start) / reps
+        fps = 1 / time_per_frame
+        print("Avg time per frame: %f5, avg fps: %f2  (avg over %d samples)" %
+              (time_per_frame, fps, reps))
+        reps = 0
+        start = time.time()
+    reps += 1
     finder.update()
     if cv2.waitKey(5) & 0xFF == ord("q"):
         break
