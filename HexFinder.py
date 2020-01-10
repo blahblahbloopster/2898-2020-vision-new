@@ -58,7 +58,7 @@ class HexFinder:
     def __init__(self, camera):
         self.camera = None
         self.img_org = None
-        self.tasks = [self.capture_video, self.contours, self.corners, self.solvepnp]
+        self.tasks = [self.capture_video, self.contours, self.filter, self.corners, self.solvepnp]
         self.times_q = multiprocessing.Queue()
         self.queues = []
         self.queues.append(multiprocessing.Queue())
@@ -114,9 +114,19 @@ class HexFinder:
             return STOP
         # hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
         # thresh = cv2.inRange(hsv, (0, 0, 0), (255, 255, 255))
-        thresh = cv2.inRange(self.img_org, (0, 150, 0), (100, 255, 100))
+        thresh = cv2.inRange(self.img_org, (0, 150, 0), (50, 255, 50))
         # print(thresh)
         return thresh
+
+    def filter(self, contours):
+        print(len(contours))
+        filtered = []
+        for cnt in contours:
+            if len(cnt) < 10:
+                continue
+            # print(cv2.arcLength(cnt, True) / cv2.contourArea(cnt))
+            filtered.append(cnt)
+        return contours
 
     def subpixel(self, corners):
         # Not being used at the moment
@@ -195,7 +205,7 @@ while True:
         start = time.time()
     reps += 1
     gotten = finder.update()
-    print(gotten)
+    # print(gotten)
     if gotten == STOP:
         break
 time.sleep(2)
