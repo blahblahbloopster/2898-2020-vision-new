@@ -9,6 +9,8 @@ import multiprocessing
 from pprint import pprint
 import os
 
+# todo: contour filtering
+
 XCenterOffset = 19.125
 YCenterOffset = 8.5
 HEX_DIMENSIONS = [[0 - XCenterOffset, 17 - YCenterOffset],
@@ -193,6 +195,7 @@ while True:
         start = time.time()
     reps += 1
     gotten = finder.update()
+    print(gotten)
     if gotten == STOP:
         break
 time.sleep(2)
