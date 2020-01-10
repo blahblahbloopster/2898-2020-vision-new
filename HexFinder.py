@@ -110,9 +110,9 @@ class HexFinder:
         ret, self.img_org = self.camera.read()
         if not ret:
             return STOP
-        hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
+        # hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
         # thresh = cv2.inRange(hsv, (0, 0, 0), (255, 255, 255))
-        thresh = cv2.inRange(hsv, (0, 150, 0), (200, 255, 255))
+        thresh = cv2.inRange(self.img_org, (0, 150, 0), (100, 255, 100))
         # print(thresh)
         return thresh
 
@@ -170,6 +170,7 @@ class HexFinder:
         times = {}
         for t in range(self.times_q.qsize()):
             times.update(self.times_q.get())
+        pprint(times)
 
     def stop(self):
         self.queues[0].put(STOP)
