@@ -111,7 +111,9 @@ class HexFinder:
         if not ret:
             return STOP
         hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
+        # thresh = cv2.inRange(hsv, (0, 0, 0), (255, 255, 255))
         thresh = cv2.inRange(hsv, (0, 150, 0), (200, 255, 255))
+        # print(thresh)
         return thresh
 
     def subpixel(self, corners):
@@ -126,7 +128,8 @@ class HexFinder:
         return subpixels
 
     def contours(self, img):
-        return cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+        num = 0 if int(cv2.__version__[0]) >= 4 else 1
+        return cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[num]
 
     def outside_corners(self, contour):
         return find_extreme_points(contour)
@@ -167,7 +170,6 @@ class HexFinder:
         times = {}
         for t in range(self.times_q.qsize()):
             times.update(self.times_q.get())
-        pprint(times)
 
     def stop(self):
         self.queues[0].put(STOP)

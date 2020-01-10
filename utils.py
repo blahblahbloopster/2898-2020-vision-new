@@ -15,11 +15,14 @@ cached = [(45,
 
 
 def find_extreme_points(cnt):
+    # try:
     leftmost = tuple(cnt[cnt[:, :, 0].argmin()][0])
     rightmost = tuple(cnt[cnt[:, :, 0].argmax()][0])
     topmost = tuple(cnt[cnt[:, :, 1].argmin()][0])
     bottommost = tuple(cnt[cnt[:, :, 1].argmax()][0])
     return leftmost, rightmost, topmost, bottommost
+    # except:
+    #     print(cnt)
 
 
 def compute_output_values(rotation_vec, translation_vec):
