@@ -85,19 +85,26 @@ def rotate_contours(degrees, list_of_points):
     #         multiplied = np.matmul(point, rotation_matrix)
     #         rotated_points.append([[multiplied[0], multiplied[1]]])
 
-    rotated_points = np.array(rotated_points, dtype=np.int8)
+    rotated_points = np.array(rotated_points, dtype=np.int32)
 
     return rotated_points
 
 
 class VirtualCamera:
 
-    def __init__(self, camera):
-        self.camera = camera
-        self.ret, self.img = self.camera.read()
+    def __init__(self, camera=None, img=None):
+        self.ret, self.img = True, np.zeros((480, 360, 3))
+        self.camera = None
+
+        if camera:
+            self.camera = camera
+            self.ret, self.img = self.camera.read()
+        elif img is not None:
+            self.ret, self.img = True, img
 
     def update(self):
-        self.ret, self.img = self.camera.read()
+        if self.camera:
+            self.ret, self.img = self.camera.read()
 
     def read(self):
         return self.ret, self.img

@@ -2,14 +2,13 @@ import time
 
 import cv2
 import numpy as np
-from utils import find_extreme_points, rotate_contours, compute_output_values
+from utils import find_extreme_points, rotate_contours, compute_output_values, VirtualCamera
 from EasyContour import EasyContour
 import pickle as pkl
 import multiprocessing
 from pprint import pprint
 import os
 
-# todo: contour filtering
 
 XCenterOffset = 19.125
 YCenterOffset = 8.5
@@ -61,10 +60,10 @@ class HexFinder:
         self.tasks = [self.capture_video, self.contours, self.filter, self.corners, self.solvepnp]
         self.times_q = multiprocessing.Queue()
         self.queues = []
-        self.queues.append(multiprocessing.Queue())
+        self.queues.append(multiprocessing.Queue(maxsize=20))
         for task in self.tasks:
-            self.queues.append(multiprocessing.Queue())
-        for i in range(10):
+            self.queues.append(multiprocessing.Queue(maxsize=5))
+        for i in range(5):
             self.queues[0].put(0)
         self.processes = []
         for index, task in enumerate(self.tasks):
@@ -88,6 +87,7 @@ class HexFinder:
         # print("{}, {}".format(str(target), os.getpid()))
         if camera:
             self.camera = cv2.VideoCapture(camera)
+            # self.camera = VirtualCamera(img=cv2.imread("output/0.png"))
         gotten = None
         output = None
         name = str(target) if not camera else "camera"
@@ -114,19 +114,25 @@ class HexFinder:
             return STOP
         # hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
         # thresh = cv2.inRange(hsv, (0, 0, 0), (255, 255, 255))
-        thresh = cv2.inRange(self.img_org, (0, 150, 0), (50, 255, 50))
+        thresh = cv2.inRange(self.img_org, (0, 60, 0), (90, 255, 90))
+        size = 12
+        thresh = cv2.dilate(thresh, (size, size), iterations=10)
+        thresh = cv2.erode(thresh, (size, size), iterations=10)
+
         # print(thresh)
         return thresh
 
     def filter(self, contours):
-        print(len(contours))
         filtered = []
         for cnt in contours:
-            if len(cnt) < 10:
+            if len(cnt) < 100:
                 continue
-            # print(cv2.arcLength(cnt, True) / cv2.contourArea(cnt))
+            if cv2.contourArea(cnt) < 1000:
+                continue
+            if not 0.25 < cv2.arcLength(cnt, True) / cv2.contourArea(cnt) < 0.4:
+                continue
             filtered.append(cnt)
-        return contours
+        return filtered
 
     def subpixel(self, corners):
         # Not being used at the moment
@@ -141,7 +147,14 @@ class HexFinder:
 
     def contours(self, img):
         num = 0 if int(cv2.__version__[0]) >= 4 else 1
-        return cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[num]
+        contours = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # img = np.zeros((480, 640, 3))
+        # cv2.drawContours(img, contours[num], -1, (255, 0, 0))
+        # cv2.imshow("contours", img)
+        # if cv2.waitKey(5) & 0xFF == ord("q"):
+        #     return STOP
+
+        return contours[num]
 
     def outside_corners(self, contour):
         return find_extreme_points(contour)
@@ -154,13 +167,15 @@ class HexFinder:
                 return None
             point1, point2, _, _ = corners
 
-            rotated = rotate_contours(45, contour)
-            point3 = find_extreme_points(rotated)[1]
-            point3 = tuple(rotate_contours(-45, np.array([[point3]]))[0][0])
+            reverse = -1
 
-            rotated = rotate_contours(-45, contour)
-            point4 = find_extreme_points(rotated)[0]
-            point4 = tuple(rotate_contours(45, np.array([[point4]]))[0][0])
+            rotated = rotate_contours(45 * reverse, contour)
+            point3 = find_extreme_points(rotated)[0]
+            point3 = tuple(rotate_contours(-45 * reverse, np.array([[point3]]))[0][0])
+
+            rotated = rotate_contours(-45 * reverse, contour)
+            point4 = find_extreme_points(rotated)[1]
+            point4 = tuple(rotate_contours(45 * reverse, np.array([[point4]]))[0][0])
 
             points.append((point1, point2, point3, point4))
 
@@ -174,6 +189,8 @@ class HexFinder:
             got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
                                                       points2, mtx, dist)
             angles.append(compute_output_values(rotation, translation))
+        if cv2.waitKey(5) & 0xFF == ord("q"):
+            pass
         return angles
 
     def kill(self):
@@ -206,7 +223,11 @@ while True:
     reps += 1
     gotten = finder.update()
     # print(gotten)
+    # if len(gotten) > 0:
+    #     print("%f in away, %f, %f" % gotten[0])
     if gotten == STOP:
         break
+
+cv2.destroyAllWindows()
 time.sleep(2)
 finder.kill()
