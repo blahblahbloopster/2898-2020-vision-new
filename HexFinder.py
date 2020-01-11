@@ -91,7 +91,7 @@ class HexFinder:
         gotten = None
         output = None
         name = str(target) if not camera else "camera"
-        while type(gotten) is not str or type(output) is str:
+        while True:
             gotten = inp_q.get()
             if gotten is None:
                 out_q.put(None)
@@ -102,10 +102,12 @@ class HexFinder:
             output = target(gotten)
             time_it(name, False)
             out_q.put(output)
+            if type(output) is str:
+                break
         if type(gotten) is str or type(output) is str:
             out_q.put(STOP)
             times_q.put(times_record)
-            print("Process exiting %s" % target)
+            print("Process exiting %s" % name)
             exit()
 
     def capture_video(self, inp):
@@ -207,7 +209,7 @@ class HexFinder:
         self.queues[0].put(STOP)
 
 
-finder = HexFinder("output.avi")
+finder = HexFinder("my_video-2.mkv")
 finder.start()
 start = time.time()
 reps = 0
@@ -228,6 +230,7 @@ while True:
     if gotten == STOP:
         break
 
+finder.stop()
 cv2.destroyAllWindows()
-time.sleep(2)
+time.sleep(4)
 finder.kill()
