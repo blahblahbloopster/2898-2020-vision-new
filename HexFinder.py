@@ -8,16 +8,16 @@ import pickle as pkl
 from pprint import pprint
 import os
 
-TRACING = False  # Enables/disables time tracking
+TRACING = True  # Enables/disables time tracking
 PIPELINE = True  # Enables/disables multiprocessing
+USE_FIXED_IMG = False  # Enables/disables using a fixed, rendered image instead of the video
+DISPLAY = False  # Enables/disables displaying debug windows
 
 if PIPELINE:
     import multiprocessing
 else:
     import multiprocessing.dummy as multiprocessing
 
-# XCenterOffset = 19.125
-# YCenterOffset = 8.5125
 HEX_DIMENSIONS = [[0, 17],
                   [39.25, 17],
                   [29.437, 0],
@@ -34,8 +34,12 @@ num = 0 if int(cv2.__version__[0]) >= 4 else 1
 
 STOP = "stop"
 
-with open('real_cam.pkl', 'rb') as f:
-    ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
+if USE_FIXED_IMG:
+    with open('imaginary_cam.pkl', 'rb') as f:
+        ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
+else:
+    with open('real_cam.pkl', 'rb') as f:
+        ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 times_dict = {}
 times_record = {}
@@ -95,50 +99,47 @@ class HexFinder:
         return self.queues[-1].get()
 
     def work_function(self, target, inp_q, out_q, times_q, camera=False):
-        # print("Initalizing")
-        # print("{}, {}".format(str(target), os.getpid()))
         if camera:
-            self.camera = cv2.VideoCapture(camera)
-            # self.camera = VirtualCamera(img=cv2.imread("output/0.png"))
-        gotten = None
+            if USE_FIXED_IMG:
+                self.camera = VirtualCamera(img=cv2.imread("output/0.png"))
+            else:
+                self.camera = cv2.VideoCapture(camera)
         output = None
         name = str(target) if not camera else "camera"
         while True:
-            gotten = inp_q.get()
-            if gotten is None:
+            gotten_from_queue = inp_q.get()
+            if gotten_from_queue is None:
                 out_q.put(None)
                 continue
-            if type(gotten) is str:
+            if type(gotten_from_queue) is str:
                 break
             time_it(name)
-            output = target(gotten)
+            output = target(gotten_from_queue)
             time_it(name, False)
             out_q.put(output)
             if type(output) is str:
                 break
-        if type(gotten) is str or type(output) is str:
+        if type(gotten_from_queue) is str or type(output) is str:
             out_q.put(STOP)
             times_q.put(times_record)
             print("Process exiting %s" % name)
             exit()
 
     def capture_video(self, inp):
-        ret, self.img_org = self.camera.read()
-        if not ret:
+        got_output, self.img_org = self.camera.read()
+        if not got_output:
             return STOP
         hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
         thresh = cv2.inRange(hsv, (20, 50, 50), (80, 255, 255))
-        # thresh = cv2.inRange(self.img_org, (0, 40, 0), (190, 255, 190))
+        # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
         size = 12
         thresh = cv2.dilate(thresh, (size, size), iterations=10)
         thresh = cv2.erode(thresh, (size, size), iterations=10)
-        # cv2.imshow("thresh", thresh)
-        # undistorted = cv2.undistort(self.img_org, mtx, dist)
-        # cv2.imshow("dist", undistorted)
-        # if cv2.waitKey(50) & 0xFF == ord("q"):
-        #     return STOP
+        if DISPLAY:
+            cv2.imshow("thresh", thresh)
+            if cv2.waitKey(5) & 0xFF == ord("q"):
+                return STOP
 
-        # print(thresh)
         return thresh
 
     def filter(self, contours):
@@ -152,8 +153,12 @@ class HexFinder:
             if cv2.contourArea(cnt) < 1000:
                 continue
 
-            # Checks perimeter/area ratio
-            if not 0.25 < cv2.arcLength(cnt, True) / cv2.contourArea(cnt) < 0.4:
+            # # Checks perimeter/area ratio
+            # if not 0.25 < cv2.arcLength(cnt, True) / cv2.contourArea(cnt) < 0.3:
+            #     continue
+
+            # Checks convex hull perimeter / perimeter ratio
+            if not 0.68 < cv2.arcLength(cv2.convexHull(cnt), True) / cv2.arcLength(cnt, True) < 0.75:
                 continue
 
             # Checks if it is too close to the edge
@@ -162,6 +167,7 @@ class HexFinder:
                 continue
 
             filtered.append(cnt)
+
         return filtered
 
     def subpixel(self, corners):
@@ -177,11 +183,12 @@ class HexFinder:
 
     def contours(self, img):
         contours = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        # img = np.zeros((480, 640, 3))
-        # cv2.drawContours(img, contours[num], -1, (255, 0, 0))
-        # cv2.imshow("contours", img)
-        # if cv2.waitKey(50) & 0xFF == ord("q"):
-        #     return STOP
+        if DISPLAY:
+            img = np.zeros((480, 640, 3))
+            cv2.drawContours(img, contours[num], -1, (255, 0, 0))
+            cv2.imshow("contours", img)
+            if cv2.waitKey(5) & 0xFF == ord("q"):
+                return STOP
 
         return contours[num]
 
@@ -218,20 +225,22 @@ class HexFinder:
             got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
                                                              points2, mtx, dist)
             angles.append(compute_output_values(rotation, translation))
-            img = np.zeros((480, 640, 3))
-            for p in point:
-                cv2.drawMarker(img, p, (255, 0, 0))
-            for p in np.squeeze(HEX_DIMENSIONS):
-                cv2.drawMarker(img, tuple(p)[0:2], (255, 0, 0))
-            cv2.aruco.drawAxis(img, mtx, dist, rotation, translation, 10)
-            cv2.imshow("axis", img)
-        if cv2.waitKey(5) & 0xFF == ord("q"):
-            return STOP
+            if DISPLAY:
+                img = np.zeros((480, 640, 3))
+                for p in point:
+                    cv2.drawMarker(img, p, (255, 0, 0))
+                cv2.aruco.drawAxis(img, mtx, dist, rotation, translation, 10)
+                cv2.imshow("axis", img)
+            if cv2.waitKey(5) & 0xFF == ord("q"):
+                return STOP
         return angles
 
     def kill(self):
         for p in self.processes:
-            p.kill()
+            try:
+                p.kill()
+            except AttributeError:
+                p.terminate()
         times = {}
         for t in range(self.times_q.qsize()):
             times.update(self.times_q.get())
@@ -247,9 +256,10 @@ finder = HexFinder("my_video-2.mkv")
 finder.start()
 start = time.time()
 reps = 0
+starting = time.time()
 print("Main pid: %s" % os.getpid())
 try:
-    while True:
+    while time.time() - starting < 10:
         if reps >= 200:
             time_per_frame = (time.time() - start) / reps
             fps = 1 / time_per_frame
@@ -260,8 +270,8 @@ try:
         reps += 1
         gotten = finder.update()
         # print(gotten)
-        if len(gotten) > 0:
-            print("%f in away, %f, %f" % gotten[0])
+        # if len(gotten) > 0:
+        #     print("%f in away, %f, %f" % gotten[0])
         if gotten == STOP:
             break
 finally:
