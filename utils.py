@@ -26,6 +26,8 @@ def find_extreme_points(cnt):
 
 
 def compute_output_values(rotation_vec, translation_vec):
+    # Stolen from ligerbots 2019 vision code
+
     # Compute the necessary output distance and angles
     x = translation_vec[0][0] + 0
     z = 0 * translation_vec[1][0] + 1 * translation_vec[2][0]

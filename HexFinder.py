@@ -5,9 +5,16 @@ import numpy as np
 from utils import find_extreme_points, rotate_contours, compute_output_values, VirtualCamera
 from EasyContour import EasyContour
 import pickle as pkl
-import multiprocessing
 from pprint import pprint
 import os
+
+TRACING = False  # Enables/disables time tracking
+PIPELINE = True  # Enables/disables multiprocessing
+
+if PIPELINE:
+    import multiprocessing
+else:
+    import multiprocessing.dummy as multiprocessing
 
 
 XCenterOffset = 19.125
@@ -19,9 +26,11 @@ HEX_DIMENSIONS = [[0 - XCenterOffset, 17 - YCenterOffset],
 HEX_DIMENSIONS = EasyContour(HEX_DIMENSIONS)
 HEX_DIMENSIONS = HEX_DIMENSIONS.format([["x", "y", 0], ["x", "y", 0]], np.float32)
 
+num = 0 if int(cv2.__version__[0]) >= 4 else 1
+
 STOP = "stop"
 
-with open('imaginary_cam.pkl', 'rb') as f:
+with open('real_cam.pkl', 'rb') as f:
     ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 
@@ -40,8 +49,8 @@ def time_it(name, starting=True):
     """
     # The function will measure the amount of time between the calls and record it.  Processes
     # will send it back to the main process which will report it.
-    # if not TRACING:
-    #     return
+    if not TRACING:
+        return
     if starting:
         times_dict[name] = time.monotonic()
     else:
@@ -114,12 +123,15 @@ class HexFinder:
         ret, self.img_org = self.camera.read()
         if not ret:
             return STOP
-        # hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
-        # thresh = cv2.inRange(hsv, (0, 0, 0), (255, 255, 255))
-        thresh = cv2.inRange(self.img_org, (0, 60, 0), (90, 255, 90))
+        hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
+        thresh = cv2.inRange(hsv, (20, 50, 50), (80, 255, 255))
+        # thresh = cv2.inRange(self.img_org, (0, 40, 0), (190, 255, 190))
         size = 12
         thresh = cv2.dilate(thresh, (size, size), iterations=10)
         thresh = cv2.erode(thresh, (size, size), iterations=10)
+        # cv2.imshow("thresh", thresh)
+        # if cv2.waitKey(1) & 0xFF == ord("q"):
+        #     return STOP
 
         # print(thresh)
         return thresh
@@ -148,12 +160,11 @@ class HexFinder:
         return subpixels
 
     def contours(self, img):
-        num = 0 if int(cv2.__version__[0]) >= 4 else 1
         contours = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # img = np.zeros((480, 640, 3))
         # cv2.drawContours(img, contours[num], -1, (255, 0, 0))
         # cv2.imshow("contours", img)
-        # if cv2.waitKey(5) & 0xFF == ord("q"):
+        # if cv2.waitKey(50) & 0xFF == ord("q"):
         #     return STOP
 
         return contours[num]
@@ -191,8 +202,13 @@ class HexFinder:
             got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
                                                       points2, mtx, dist)
             angles.append(compute_output_values(rotation, translation))
+            img = np.zeros((480, 640, 3))
+            for p in point:
+                cv2.drawMarker(img, p, (255, 0, 0))
+            # cv2.aruco.drawAxis(img, mtx, dist, rotation, translation, 10)
+            cv2.imshow("axis", img)
         if cv2.waitKey(5) & 0xFF == ord("q"):
-            pass
+            return STOP
         return angles
 
     def kill(self):
@@ -225,12 +241,12 @@ while True:
     reps += 1
     gotten = finder.update()
     # print(gotten)
-    # if len(gotten) > 0:
-    #     print("%f in away, %f, %f" % gotten[0])
+    if len(gotten) > 0:
+        print("%f in away, %f, %f" % gotten[0])
     if gotten == STOP:
         break
 
 finder.stop()
 cv2.destroyAllWindows()
-time.sleep(4)
+time.sleep(1)
 finder.kill()
