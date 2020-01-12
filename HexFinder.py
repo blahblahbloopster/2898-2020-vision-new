@@ -16,13 +16,17 @@ if PIPELINE:
 else:
     import multiprocessing.dummy as multiprocessing
 
+# XCenterOffset = 19.125
+# YCenterOffset = 8.5125
+HEX_DIMENSIONS = [[0, 17],
+                  [39.25, 17],
+                  [29.437, 0],
+                  [9.812, 0]]
+XCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[0])[0] / 2
+YCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[1])[1] / 2
 
-XCenterOffset = 19.125
-YCenterOffset = 8.5
-HEX_DIMENSIONS = [[0 - XCenterOffset, 17 - YCenterOffset],
-                  [39.25 - XCenterOffset, 17 - YCenterOffset],
-                  [29.437 - XCenterOffset, 0 - YCenterOffset],
-                  [9.812 - XCenterOffset, 0 - YCenterOffset]]
+for index, d in enumerate(HEX_DIMENSIONS):
+    HEX_DIMENSIONS[index] = d[0] - XCenterOffset, -d[1] + YCenterOffset
 HEX_DIMENSIONS = EasyContour(HEX_DIMENSIONS)
 HEX_DIMENSIONS = HEX_DIMENSIONS.format([["x", "y", 0], ["x", "y", 0]], np.float32)
 
@@ -32,7 +36,6 @@ STOP = "stop"
 
 with open('real_cam.pkl', 'rb') as f:
     ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
-
 
 times_dict = {}
 times_record = {}
@@ -130,7 +133,9 @@ class HexFinder:
         thresh = cv2.dilate(thresh, (size, size), iterations=10)
         thresh = cv2.erode(thresh, (size, size), iterations=10)
         # cv2.imshow("thresh", thresh)
-        # if cv2.waitKey(1) & 0xFF == ord("q"):
+        # undistorted = cv2.undistort(self.img_org, mtx, dist)
+        # cv2.imshow("dist", undistorted)
+        # if cv2.waitKey(50) & 0xFF == ord("q"):
         #     return STOP
 
         # print(thresh)
@@ -139,12 +144,23 @@ class HexFinder:
     def filter(self, contours):
         filtered = []
         for cnt in contours:
+            # Checks number of points (rough estimation of size)
             if len(cnt) < 100:
                 continue
+
+            # Checks area
             if cv2.contourArea(cnt) < 1000:
                 continue
+
+            # Checks perimeter/area ratio
             if not 0.25 < cv2.arcLength(cnt, True) / cv2.contourArea(cnt) < 0.4:
                 continue
+
+            # Checks if it is too close to the edge
+            extreme_points = find_extreme_points(cnt)
+            if extreme_points[0][0] < 10 or extreme_points[1][0] > 630:
+                continue
+
             filtered.append(cnt)
         return filtered
 
@@ -190,7 +206,7 @@ class HexFinder:
             point4 = find_extreme_points(rotated)[1]
             point4 = tuple(rotate_contours(45 * reverse, np.array([[point4]]))[0][0])
 
-            points.append((point1, point2, point3, point4))
+            points.append((point1, point2, point4, point3))
 
         return points
 
@@ -200,12 +216,14 @@ class HexFinder:
             points2 = np.array(point, dtype=np.float32)
 
             got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
-                                                      points2, mtx, dist)
+                                                             points2, mtx, dist)
             angles.append(compute_output_values(rotation, translation))
             img = np.zeros((480, 640, 3))
             for p in point:
                 cv2.drawMarker(img, p, (255, 0, 0))
-            # cv2.aruco.drawAxis(img, mtx, dist, rotation, translation, 10)
+            for p in np.squeeze(HEX_DIMENSIONS):
+                cv2.drawMarker(img, tuple(p)[0:2], (255, 0, 0))
+            cv2.aruco.drawAxis(img, mtx, dist, rotation, translation, 10)
             cv2.imshow("axis", img)
         if cv2.waitKey(5) & 0xFF == ord("q"):
             return STOP
@@ -230,23 +248,24 @@ finder.start()
 start = time.time()
 reps = 0
 print("Main pid: %s" % os.getpid())
-while True:
-    if reps >= 200:
-        time_per_frame = (time.time() - start) / reps
-        fps = 1 / time_per_frame
-        print("Avg time per frame: %f5, avg fps: %f2  (avg over %d samples)" %
-              (time_per_frame, fps, reps))
-        reps = 0
-        start = time.time()
-    reps += 1
-    gotten = finder.update()
-    # print(gotten)
-    if len(gotten) > 0:
-        print("%f in away, %f, %f" % gotten[0])
-    if gotten == STOP:
-        break
-
-finder.stop()
-cv2.destroyAllWindows()
-time.sleep(1)
-finder.kill()
+try:
+    while True:
+        if reps >= 200:
+            time_per_frame = (time.time() - start) / reps
+            fps = 1 / time_per_frame
+            print("Avg time per frame: %f5, avg fps: %f2  (avg over %d samples)" %
+                  (time_per_frame, fps, reps))
+            reps = 0
+            start = time.time()
+        reps += 1
+        gotten = finder.update()
+        # print(gotten)
+        if len(gotten) > 0:
+            print("%f in away, %f, %f" % gotten[0])
+        if gotten == STOP:
+            break
+finally:
+    finder.stop()
+    cv2.destroyAllWindows()
+    time.sleep(0.25)
+    finder.kill()
