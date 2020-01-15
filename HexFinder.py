@@ -10,7 +10,7 @@ import os
 
 TRACING = True  # Enables/disables time tracking
 PIPELINE = True  # Enables/disables multiprocessing
-USE_FIXED_IMG = False  # Enables/disables using a fixed, rendered image instead of the video
+USE_FIXED_IMG = True  # Enables/disables using a fixed, rendered image instead of the video
 DISPLAY = False  # Enables/disables displaying debug windows
 
 if PIPELINE:
@@ -73,7 +73,7 @@ class HexFinder:
     def __init__(self, camera):
         self.camera = None
         self.img_org = None
-        self.tasks = [self.capture_video, self.contours, self.filter, self.corners, self.solvepnp]
+        self.tasks = [self.capture_video, self.contours, self.filter, self.corners, self.solvepnp, self.process_output]
         self.times_q = multiprocessing.Queue()
         self.queues = []
         self.queues.append(multiprocessing.Queue(maxsize=20))
@@ -133,8 +133,8 @@ class HexFinder:
         thresh = cv2.inRange(hsv, (20, 50, 50), (80, 255, 255))
         # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
         size = 12
-        thresh = cv2.dilate(thresh, (size, size), iterations=10)
-        thresh = cv2.erode(thresh, (size, size), iterations=10)
+        thresh = cv2.dilate(thresh, (size, size), iterations=1)
+        thresh = cv2.erode(thresh, (size, size), iterations=1)
         if DISPLAY:
             cv2.imshow("thresh", thresh)
             if cv2.waitKey(5) & 0xFF == ord("q"):
@@ -224,7 +224,7 @@ class HexFinder:
 
             got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
                                                              points2, mtx, dist)
-            angles.append(compute_output_values(rotation, translation))
+            angles.append((rotation, translation))
             if DISPLAY:
                 img = np.zeros((480, 640, 3))
                 for p in point:
@@ -234,6 +234,12 @@ class HexFinder:
             if cv2.waitKey(5) & 0xFF == ord("q"):
                 return STOP
         return angles
+
+    def process_output(self, vectors):
+        processed = []
+        for vector_set in vectors:
+            processed.append(compute_output_values(vector_set[0], vector_set[1]))
+        return processed
 
     def kill(self):
         for p in self.processes:
@@ -259,7 +265,7 @@ reps = 0
 starting = time.time()
 print("Main pid: %s" % os.getpid())
 try:
-    while time.time() - starting < 10:
+    while time.time() - starting < 10 and USE_FIXED_IMG:
         if reps >= 200:
             time_per_frame = (time.time() - start) / reps
             fps = 1 / time_per_frame
