@@ -10,8 +10,8 @@ import os
 
 TRACING = True  # Enables/disables time tracking
 PIPELINE = True  # Enables/disables multiprocessing
-USE_FIXED_IMG = True  # Enables/disables using a fixed, rendered image instead of the video
-DISPLAY = False  # Enables/disables displaying debug windows
+USE_FIXED_IMG = False  # Enables/disables using a fixed, rendered image instead of the video
+DISPLAY = True  # Enables/disables displaying debug windows
 
 if PIPELINE:
     import multiprocessing
@@ -38,7 +38,7 @@ if USE_FIXED_IMG:
     with open('imaginary_cam.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 else:
-    with open('real_cam.pkl', 'rb') as f:
+    with open('ps3_cam.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 times_dict = {}
@@ -136,7 +136,11 @@ class HexFinder:
         thresh = cv2.dilate(thresh, (size, size), iterations=1)
         thresh = cv2.erode(thresh, (size, size), iterations=1)
         if DISPLAY:
+            undistort = cv2.undistort(self.img_org, mtx, dist)
+            cv2.imshow("undistort", undistort)
             cv2.imshow("thresh", thresh)
+            undistort = cv2.undistort(self.img_org, mtx, dist)
+            cv2.imshow("undistort", undistort)
             if cv2.waitKey(5) & 0xFF == ord("q"):
                 return STOP
 
@@ -158,7 +162,7 @@ class HexFinder:
             #     continue
 
             # Checks convex hull perimeter / perimeter ratio
-            if not 0.68 < cv2.arcLength(cv2.convexHull(cnt), True) / cv2.arcLength(cnt, True) < 0.75:
+            if not 0.6 < cv2.arcLength(cv2.convexHull(cnt), True) / cv2.arcLength(cnt, True) < 0.9:
                 continue
 
             # Checks if it is too close to the edge
@@ -167,7 +171,8 @@ class HexFinder:
                 continue
 
             filtered.append(cnt)
-
+        # if len(filtered) == 0:
+        #     print("All contours filtered out")
         return filtered
 
     def subpixel(self, corners):
@@ -258,14 +263,14 @@ class HexFinder:
         self.queues[0].put(STOP)
 
 
-finder = HexFinder("my_video-2.mkv")
+finder = HexFinder(3)
 finder.start()
 start = time.time()
 reps = 0
 starting = time.time()
 print("Main pid: %s" % os.getpid())
 try:
-    while time.time() - starting < 10 and USE_FIXED_IMG:
+    while time.time() - starting < 10 or not USE_FIXED_IMG:
         if reps >= 200:
             time_per_frame = (time.time() - start) / reps
             fps = 1 / time_per_frame
@@ -276,8 +281,8 @@ try:
         reps += 1
         gotten = finder.update()
         # print(gotten)
-        # if len(gotten) > 0:
-        #     print("%f in away, %f, %f" % gotten[0])
+        if len(gotten) > 0:
+            print("%f in away, %f, %f" % gotten[0])
         if gotten == STOP:
             break
 finally:
