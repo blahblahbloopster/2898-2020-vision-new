@@ -10,7 +10,7 @@ import os
 
 TRACING = True  # Enables/disables time tracking
 PIPELINE = True  # Enables/disables multiprocessing
-USE_FIXED_IMG = False  # Enables/disables using a fixed, rendered image instead of the video
+USE_FIXED_IMG = True  # Enables/disables using a fixed, rendered image instead of the video
 DISPLAY = True  # Enables/disables displaying debug windows
 
 if PIPELINE:
@@ -22,11 +22,13 @@ HEX_DIMENSIONS = [[0, 17],
                   [39.25, 17],
                   [29.437, 0],
                   [9.812, 0]]
+HEX_DIMENSIONS.reverse()
 XCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[0])[0] / 2
-YCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[1])[1] / 2
+YCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[1])[1]
 
 for index, d in enumerate(HEX_DIMENSIONS):
-    HEX_DIMENSIONS[index] = d[0] - XCenterOffset, -d[1] + YCenterOffset
+    HEX_DIMENSIONS[index] = d[0] - XCenterOffset, d[1]
+print(HEX_DIMENSIONS)
 HEX_DIMENSIONS = EasyContour(HEX_DIMENSIONS)
 HEX_DIMENSIONS = HEX_DIMENSIONS.format([["x", "y", 0], ["x", "y", 0]], np.float32)
 
@@ -35,15 +37,16 @@ num = 0 if int(cv2.__version__[0]) >= 4 else 1
 STOP = "stop"
 
 if USE_FIXED_IMG:
-    with open('imaginary_cam.pkl', 'rb') as f:
+    with open('imaginary_cam2.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 else:
-    with open('ps3_cam.pkl', 'rb') as f:
+    with open('ps3_cam2.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 times_dict = {}
 times_record = {}
 frame_count = 0
+colors = ((255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 255))
 
 
 def time_it(name, starting=True):
@@ -73,7 +76,7 @@ class HexFinder:
     def __init__(self, camera):
         self.camera = None
         self.img_org = None
-        self.tasks = [self.capture_video, self.contours, self.filter, self.corners, self.solvepnp, self.process_output]
+        self.tasks = [self.capture_video, self.contours, self.filter, self.corners, self.solvepnp]
         self.times_q = multiprocessing.Queue()
         self.queues = []
         self.queues.append(multiprocessing.Queue(maxsize=20))
@@ -101,7 +104,9 @@ class HexFinder:
     def work_function(self, target, inp_q, out_q, times_q, camera=False):
         if camera:
             if USE_FIXED_IMG:
-                self.camera = VirtualCamera(img=cv2.imread("output/0.png"))
+                # img = cv2.imread("test_img4.png")
+                # print(img.shape)
+                self.camera = VirtualCamera(img=cv2.imread("test_img5.png"))
             else:
                 self.camera = cv2.VideoCapture(camera)
         output = None
@@ -130,11 +135,11 @@ class HexFinder:
         if not got_output:
             return STOP
         hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
-        thresh = cv2.inRange(hsv, (20, 50, 50), (80, 255, 255))
+        thresh = cv2.inRange(hsv, (20, 40, 110), (80, 255, 255))
         # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
-        size = 12
-        thresh = cv2.dilate(thresh, (size, size), iterations=1)
-        thresh = cv2.erode(thresh, (size, size), iterations=1)
+        # size = 12
+        # thresh = cv2.dilate(thresh, (size, size), iterations=1)
+        # thresh = cv2.erode(thresh, (size, size), iterations=1)
         if DISPLAY:
             undistort = cv2.undistort(self.img_org, mtx, dist)
             cv2.imshow("undistort", undistort)
@@ -143,6 +148,7 @@ class HexFinder:
             cv2.imshow("undistort", undistort)
             if cv2.waitKey(5) & 0xFF == ord("q"):
                 return STOP
+        # undistort = cv2.undistort(thresh, mtx, dist)
 
         return thresh
 
@@ -208,7 +214,7 @@ class HexFinder:
                 return None
             point1, point2, _, _ = corners
 
-            reverse = -1
+            reverse = -1.05
 
             rotated = rotate_contours(45 * reverse, contour)
             point3 = find_extreme_points(rotated)[0]
@@ -219,6 +225,14 @@ class HexFinder:
             point4 = tuple(rotate_contours(45 * reverse, np.array([[point4]]))[0][0])
 
             points.append((point1, point2, point4, point3))
+        img = np.zeros((480, 640, 3))
+        for p in points:
+            for index, point in enumerate(p):
+                cv2.drawMarker(img, point, colors[index])
+        cv2.drawContours(img, contours, -1, (0, 0, 255))
+        cv2.imshow("corners", img)
+        if cv2.waitKey(5) & 0xFF == ord("q"):
+            return STOP
 
         return points
 
@@ -229,21 +243,31 @@ class HexFinder:
 
             got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
                                                              points2, mtx, dist)
-            angles.append((rotation, translation))
+            angles.append(compute_output_values(rotation, translation))
             if DISPLAY:
                 img = np.zeros((480, 640, 3))
-                for p in point:
-                    cv2.drawMarker(img, p, (255, 0, 0))
-                cv2.aruco.drawAxis(img, mtx, dist, rotation, translation, 10)
+                for index, p in enumerate(point):
+                    cv2.drawMarker(img, p, colors[index])
+                cv2.aruco.drawAxis(img, mtx, dist, rotation, translation, 20)
+                for index, q in enumerate(np.squeeze(HEX_DIMENSIONS)):
+                    p = q.copy()
+                    p = p[0:2]
+                    p[0] += 20
+                    p[1] += 20
+                    cv2.drawMarker(img, tuple(p), colors[index])
+                # new_points, _ = cv2.projectPoints(HEX_DIMENSIONS, rotation, translation, mtx, dist)
+                # for p in new_points:
+                #     p = (int(np.ndarray.tolist(p)[0][0]), int(np.ndarray.tolist(p)[0][1]))
+                #     cv2.drawMarker(img, p, (0, 0, 255))
                 cv2.imshow("axis", img)
-            if cv2.waitKey(5) & 0xFF == ord("q"):
-                return STOP
+                if cv2.waitKey(5) & 0xFF == ord("q"):
+                    return STOP
         return angles
 
     def process_output(self, vectors):
         processed = []
-        for vector_set in vectors:
-            processed.append(compute_output_values(vector_set[0], vector_set[1]))
+        for rotation, translation in vectors:
+            processed.append(compute_output_values(rotation, translation))
         return processed
 
     def kill(self):
@@ -263,7 +287,7 @@ class HexFinder:
         self.queues[0].put(STOP)
 
 
-finder = HexFinder(3)
+finder = HexFinder(2)
 finder.start()
 start = time.time()
 reps = 0
@@ -280,9 +304,9 @@ try:
             start = time.time()
         reps += 1
         gotten = finder.update()
-        # print(gotten)
-        if len(gotten) > 0:
-            print("%f in away, %f, %f" % gotten[0])
+        print(gotten)
+        # if len(gotten) > 0:
+        #     print("%f in away, %f, %f" % gotten[0])
         if gotten == STOP:
             break
 finally:

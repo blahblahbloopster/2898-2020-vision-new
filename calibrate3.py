@@ -6,11 +6,12 @@ import pickle as pkl
 
 images = np.asarray([img for img in [
     cv2.cvtColor(
-        cv2.imread('camera-calib5/'+img),
+        cv2.imread('rendered_chessboard/'+img),
         cv2.COLOR_BGR2GRAY
     )
-    for img in os.listdir('camera-calib5/')
+    for img in os.listdir('rendered_chessboard/')
 ]])
+names = os.listdir("rendered_chessboard/")
 
 termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30000, 0.000001)
 W = 8
@@ -21,7 +22,7 @@ objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2)
 objpoints = []
 imgpoints = []
 
-for img in images:
+for index, img in enumerate(images):
     ret, corners = cv2.findChessboardCorners(img, (L, W), None)
     if ret:
         objpoints.append(objp)
@@ -33,18 +34,19 @@ for img in images:
         )
         imgpoints.append(refinedCorners)
         # Draw and display the corners
-        # cv2.drawChessboardCorners(img, (7, 6), refinedCorners, ret)
+        cv2.drawChessboardCorners(img, (W, L), refinedCorners, ret)
+    print(names[index])
 
-    # while True:
-    #    cv2.imshow('img', img)
-    #    if cv2.waitKey(1) & 0xFF == ord('q'):
-    #        break
-    # cv2.destroyAllWindows()
+    while True:
+       cv2.imshow('img', img)
+       if cv2.waitKey(1) & 0xFF == ord('q'):
+           break
+    cv2.destroyAllWindows()
 # print(imgpoints)
 # exit()
 ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, images[0].shape[::-1], None, None)
 
-with open('ps3_cam.pkl', 'wb') as f:
+with open('imaginary_cam2.pkl', 'wb') as f:
     pkl.dump([ret, mtx, dist, rvecs, tvecs], f)
 
 print("mtx")
