@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import socket
 import time
 from subprocess import check_output

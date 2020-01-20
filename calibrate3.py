@@ -6,18 +6,18 @@ import pickle as pkl
 
 images = np.asarray([img for img in [
     cv2.cvtColor(
-        cv2.imread('rendered_chessboard/'+img),
+        cv2.imread('rendered_chessboard2/'+img),
         cv2.COLOR_BGR2GRAY
     )
-    for img in os.listdir('rendered_chessboard/')
+    for img in os.listdir('rendered_chessboard2/')
 ]])
-names = os.listdir("rendered_chessboard/")
+names = os.listdir("rendered_chessboard2")
 
 termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30000, 0.000001)
 W = 8
 L = 6
 objp = np.zeros((W*L, 3), np.float32)
-objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2)
+objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2) * 15.72
 
 objpoints = []
 imgpoints = []
@@ -46,7 +46,7 @@ for index, img in enumerate(images):
 # exit()
 ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, images[0].shape[::-1], None, None)
 
-with open('imaginary_cam2.pkl', 'wb') as f:
+with open('another_imaginary_cam.pkl', 'wb') as f:
     pkl.dump([ret, mtx, dist, rvecs, tvecs], f)
 
 print("mtx")

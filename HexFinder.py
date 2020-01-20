@@ -22,7 +22,7 @@ HEX_DIMENSIONS = [[0, 17],
                   [39.25, 17],
                   [29.437, 0],
                   [9.812, 0]]
-HEX_DIMENSIONS.reverse()
+# HEX_DIMENSIONS.reverse()
 XCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[0])[0] / 2
 YCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[1])[1]
 
@@ -37,10 +37,10 @@ num = 0 if int(cv2.__version__[0]) >= 4 else 1
 STOP = "stop"
 
 if USE_FIXED_IMG:
-    with open('imaginary_cam2.pkl', 'rb') as f:
+    with open('another_imaginary_cam.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 else:
-    with open('ps3_cam2.pkl', 'rb') as f:
+    with open('printer_camera.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 times_dict = {}
@@ -106,7 +106,7 @@ class HexFinder:
             if USE_FIXED_IMG:
                 # img = cv2.imread("test_img4.png")
                 # print(img.shape)
-                self.camera = VirtualCamera(img=cv2.imread("test_img5.png"))
+                self.camera = VirtualCamera(img=cv2.imread("rendered_images/100in.png"))
             else:
                 self.camera = cv2.VideoCapture(camera)
         output = None
@@ -160,7 +160,7 @@ class HexFinder:
                 continue
 
             # Checks area
-            if cv2.contourArea(cnt) < 1000:
+            if cv2.contourArea(cnt) < 100:
                 continue
 
             # # Checks perimeter/area ratio
@@ -287,7 +287,7 @@ class HexFinder:
         self.queues[0].put(STOP)
 
 
-finder = HexFinder(2)
+finder = HexFinder(3)
 finder.start()
 start = time.time()
 reps = 0
