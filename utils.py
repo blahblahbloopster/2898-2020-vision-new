@@ -25,31 +25,59 @@ def find_extreme_points(cnt):
     #     print(cnt)
 
 
-def compute_output_values(rotation_vec, translation_vec):
-    # Stolen from ligerbots 2019 vision code
-
+def compute_output_values(rvec, tvec):
     # Compute the necessary output distance and angles
-    x = translation_vec[0][0] + 0
-    z = 0 * translation_vec[1][0] + 1 * translation_vec[2][0]
 
-    # distance in the horizontal plane between robot center and target
-    robot_distance = math.sqrt(x**2 + z**2)
+    # The tilt angle only affects the distance and angle1 calcs
 
-    # horizontal angle between robot center line and target
-    robot_to_target_angle = math.atan2(x, z)
+    x = tvec[0][0]
+    z = math.sin(math.radians(20)) * tvec[1][0] + math.cos(math.radians(20)) * tvec[2][0]
 
-    rot, _ = cv2.Rodrigues(rotation_vec)
+    # distance in the horizontal plane between camera and target
+    distance = math.sqrt(x ** 2 + z ** 2)
+
+    # horizontal angle between camera center line and target
+    angle1 = math.atan2(x, z)
+
+    rot, _ = cv2.Rodrigues(rvec)
     rot_inv = rot.transpose()
+    # This should be pzero_world = numpy.matmul(rot_inv, -tvec)
+    B = np.mat(rot_inv)
+    C = np.mat(-tvec)
 
-    # version if there is not offset for the camera (VERY slightly faster)
-    # pzero_world = numpy.matmul(rot_inv, -tvec)
+    A = B * C
+    pzero_world = A
 
-    # version if camera is offset
-    pzero_world = np.matmul(rot_inv, 0 - translation_vec)
+    angle2 = math.atan2(pzero_world[0][0], pzero_world[2][0])
 
-    other_angle = math.atan2(pzero_world[0][0], pzero_world[2][0])
+    return distance, math.degrees(angle1), math.degrees(angle2)
 
-    return robot_distance, robot_to_target_angle, other_angle
+
+# def compute_output_values(rotation_vec, translation_vec):
+#     # Stolen from ligerbots 2019 vision code
+#
+#     # Compute the necessary output distance and angles
+#     x = translation_vec[0][0] + 0
+#     z = 0 * translation_vec[1][0] + 1 * translation_vec[2][0]
+#
+#     # distance in the horizontal plane between robot center and target
+#     robot_distance = math.sqrt(x**2 + z**2)
+#
+#     # horizontal angle between robot center line and target
+#     robot_to_target_angle = math.atan2(x, z)
+#
+#     rot, _ = cv2.Rodrigues(rotation_vec)
+#     rot_inv = rot.transpose()
+#
+#     # version if there is not offset for the camera (VERY slightly faster)
+#     # pzero_world = numpy.matmul(rot_inv, -tvec)
+#
+#     # version if camera is offset
+#     pzero_world = np.matmul(rot_inv, 0 - translation_vec)
+#
+#     other_angle = math.atan2(pzero_world[0][0], pzero_world[2][0])
+#
+#     return robot_distance, robot_to_target_angle, other_angle
 
 
 def rotate_contours(degrees, list_of_points):

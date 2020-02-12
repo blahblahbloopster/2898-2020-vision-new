@@ -1,8 +1,7 @@
 import cv2
 import numpy as np
 import func_timeout
-import os
-import time
+import pickle as pkl
 
 cap = cv2.VideoCapture(2)
 
@@ -10,7 +9,7 @@ termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30000, 0.000
 W = 6
 L = 8
 objp = np.zeros((W*L, 3), np.float32)
-objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2) * (14/16)
+objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2) * 0.944
 
 last = False
 
@@ -21,24 +20,19 @@ objectPoints = []
 while True:
     ret, img_org = cap.read()
 
-    def foo(img):
-        global img_org
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        ret2, corners = cv2.findChessboardCorners(gray, (L, W), None)
+    cv2.imshow("aaa", img_org)
+
+    gray = cv2.cvtColor(img_org, cv2.COLOR_BGR2GRAY)
+    ret2, corners2 = cv2.findChessboardCorners(gray, (L, W), None)
+    refined_corners = corners2
+    if ret2:
         refined_corners = cv2.cornerSubPix(
             gray,
-            corners,
+            corners2,
             (11, 11), (-1, -1),
             termCriteria
         )
-        cv2.drawChessboardCorners(img_org, (L, W), refined_corners, ret2)
-        return refined_corners
-
-    output = None
-    try:
-        output = func_timeout.func_timeout(0.1, foo, (img_org,))
-    except func_timeout.FunctionTimedOut:
-        pass
+    cv2.drawChessboardCorners(img_org, (L, W), refined_corners, ret2)
 
     cv2.imshow("img", img_org)
     key = cv2.waitKey(5) & 0xFF
@@ -46,9 +40,9 @@ while True:
         if key == ord("q"):
             break
         else:
-            if not last and output is not None:
+            if not last and refined_corners is not None:
                 objectPoints.append(objp)
-                corners.append(output)
+                corners.append(refined_corners)
                 last = True
     else:
         last = False
@@ -59,7 +53,7 @@ h, w = img_zero.shape[:2]
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
 dst = cv2.undistort(img_zero, mtx, dist, None, newcameramtx)
 x, y, w, h = roi
-dst = img_zero[y:y+h, x:x+w]
+dst = dst[y:y+h, x:x+w]
 while True:
     if dst is not None:
         cv2.imshow('calib', dst)
@@ -67,3 +61,6 @@ while True:
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 cv2.destroyAllWindows()
+
+with open('elp_camera.pkl', 'wb') as f:
+    pkl.dump([ret, mtx, dist, rvecs, tvecs], f)

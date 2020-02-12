@@ -37,10 +37,10 @@ num = 0 if int(cv2.__version__[0]) >= 4 else 1
 STOP = "stop"
 
 if USE_FIXED_IMG:
-    with open('another_imaginary_cam.pkl', 'rb') as f:
+    with open('imaginary_cam_for_real.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 else:
-    with open('printer_camera.pkl', 'rb') as f:
+    with open('elp_camera.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 times_dict = {}
@@ -106,7 +106,7 @@ class HexFinder:
             if USE_FIXED_IMG:
                 # img = cv2.imread("test_img4.png")
                 # print(img.shape)
-                self.camera = VirtualCamera(img=cv2.imread("rendered_images/100in.png"))
+                self.camera = VirtualCamera(img=cv2.imread("rendered_images/bleh.png"))
             else:
                 self.camera = cv2.VideoCapture(camera)
         output = None
@@ -135,7 +135,7 @@ class HexFinder:
         if not got_output:
             return STOP
         hsv = cv2.cvtColor(self.img_org, cv2.COLOR_RGB2HSV)
-        thresh = cv2.inRange(hsv, (20, 40, 110), (80, 255, 255))
+        thresh = cv2.inRange(hsv, (0, 0, 10), (255, 255, 255))
         # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
         # size = 12
         # thresh = cv2.dilate(thresh, (size, size), iterations=1)
@@ -173,7 +173,7 @@ class HexFinder:
 
             # Checks if it is too close to the edge
             extreme_points = find_extreme_points(cnt)
-            if extreme_points[0][0] < 10 or extreme_points[1][0] > 630:
+            if extreme_points[0][0] < 10 or extreme_points[1][0] > 1070:
                 continue
 
             filtered.append(cnt)
@@ -195,7 +195,7 @@ class HexFinder:
     def contours(self, img):
         contours = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if DISPLAY:
-            img = np.zeros((480, 640, 3))
+            img = np.zeros((720, 1080, 3))
             cv2.drawContours(img, contours[num], -1, (255, 0, 0))
             cv2.imshow("contours", img)
             if cv2.waitKey(5) & 0xFF == ord("q"):
@@ -225,7 +225,7 @@ class HexFinder:
             point4 = tuple(rotate_contours(45 * reverse, np.array([[point4]]))[0][0])
 
             points.append((point1, point2, point4, point3))
-        img = np.zeros((480, 640, 3))
+        img = np.zeros((720, 1080, 3))
         for p in points:
             for index, point in enumerate(p):
                 cv2.drawMarker(img, point, colors[index])
@@ -243,9 +243,9 @@ class HexFinder:
 
             got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
                                                              points2, mtx, dist)
-            angles.append(compute_output_values(rotation, translation))
+            angles.append((rotation, translation))
             if DISPLAY:
-                img = np.zeros((480, 640, 3))
+                img = np.zeros((720, 1080, 3))
                 for index, p in enumerate(point):
                     cv2.drawMarker(img, p, colors[index])
                 cv2.aruco.drawAxis(img, mtx, dist, rotation, translation, 20)
