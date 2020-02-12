@@ -106,7 +106,7 @@ class HexFinder:
             if USE_FIXED_IMG:
                 # img = cv2.imread("test_img4.png")
                 # print(img.shape)
-                self.camera = VirtualCamera(img=cv2.imread("rendered_images/i_really_hope_this_works.png"))
+                self.camera = VirtualCamera(img=cv2.imread("rendered_images/400in10d10dup.png"))
             else:
                 self.camera = cv2.VideoCapture(camera)
         output = None

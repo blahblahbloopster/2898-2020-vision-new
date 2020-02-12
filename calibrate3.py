@@ -18,7 +18,7 @@ termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30000, 0.000
 W = 8
 L = 6
 objp = np.zeros((W*L, 3), np.float32)
-objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2) * 24.60925197
+objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2) * 1
 
 objpoints = []
 imgpoints = []
