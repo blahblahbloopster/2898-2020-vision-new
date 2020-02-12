@@ -31,7 +31,8 @@ def compute_output_values(rvec, tvec):
     # The tilt angle only affects the distance and angle1 calcs
 
     x = tvec[0][0]
-    z = math.sin(math.radians(20)) * tvec[1][0] + math.cos(math.radians(20)) * tvec[2][0]
+    angle = 0
+    z = math.sin(math.radians(angle)) * tvec[1][0] + math.cos(math.radians(angle)) * tvec[2][0]
 
     # distance in the horizontal plane between camera and target
     distance = math.sqrt(x ** 2 + z ** 2)

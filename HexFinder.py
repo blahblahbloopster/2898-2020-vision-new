@@ -106,7 +106,7 @@ class HexFinder:
             if USE_FIXED_IMG:
                 # img = cv2.imread("test_img4.png")
                 # print(img.shape)
-                self.camera = VirtualCamera(img=cv2.imread("rendered_images/bleh.png"))
+                self.camera = VirtualCamera(img=cv2.imread("rendered_images/i_really_hope_this_works.png"))
             else:
                 self.camera = cv2.VideoCapture(camera)
         output = None
@@ -243,7 +243,7 @@ class HexFinder:
 
             got_output, rotation, translation = cv2.solvePnP(HEX_DIMENSIONS,
                                                              points2, mtx, dist)
-            angles.append((rotation, translation))
+            angles.append(compute_output_values(rotation, translation))
             if DISPLAY:
                 img = np.zeros((720, 1080, 3))
                 for index, p in enumerate(point):
