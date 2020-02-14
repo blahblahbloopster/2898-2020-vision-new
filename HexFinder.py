@@ -28,7 +28,6 @@ YCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[1])[1]
 
 for index, d in enumerate(HEX_DIMENSIONS):
     HEX_DIMENSIONS[index] = d[0] - XCenterOffset, d[1]
-print(HEX_DIMENSIONS)
 HEX_DIMENSIONS = EasyContour(HEX_DIMENSIONS)
 HEX_DIMENSIONS = HEX_DIMENSIONS.format([["x", "y", 0], ["x", "y", 0]], np.float32)
 
@@ -106,7 +105,7 @@ class HexFinder:
             if USE_FIXED_IMG:
                 # img = cv2.imread("test_img4.png")
                 # print(img.shape)
-                self.camera = VirtualCamera(img=cv2.imread("rendered_images/400in10d10dup.png"))
+                self.camera = VirtualCamera(img=cv2.imread("rendered_images/400in_straight2.png"))
             else:
                 self.camera = cv2.VideoCapture(camera)
         output = None
