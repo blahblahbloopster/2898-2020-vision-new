@@ -121,6 +121,23 @@ def rotate_contours(degrees, list_of_points):
     return rotated_points
 
 
+def simplify(contour, numPoints, tick=None):
+    """Simplifies contour to numPoints total points"""
+    if tick is None:
+        tick = cv2.arcLength(contour, True) * 0.01
+    epsilon = cv2.arcLength(contour, True) * 0.01
+    while len(cv2.approxPolyDP(contour, epsilon, True)) > numPoints:
+        epsilon += tick
+    return cv2.approxPolyDP(contour, epsilon, True)
+
+
+def getCoords(contour):
+    """Returns contour XY coords"""
+    M = cv2.moments(contour)
+    x = int(M['m10']/M['m00'])
+    y = int(M['m01']/M['m00'])
+    return (x, y)
+
 class VirtualCamera:
 
     def __init__(self, camera=None, img=None):
