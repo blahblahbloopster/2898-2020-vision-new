@@ -62,5 +62,5 @@ while True:
         break
 cv2.destroyAllWindows()
 
-with open('elp_camera.pkl', 'wb') as f:
+with open('calibration/elp_camera.pkl', 'wb') as f:
     pkl.dump([ret, mtx, dist, rvecs, tvecs], f)

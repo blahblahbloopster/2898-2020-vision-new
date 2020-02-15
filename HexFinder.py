@@ -3,11 +3,9 @@ from math import sqrt
 
 import cv2
 import numpy as np
-from utils import find_extreme_points, rotate_contours, compute_output_values, VirtualCamera, simplify, getCoords
+from utils import find_extreme_points, compute_output_values, VirtualCamera, getCoords
 from EasyContour import EasyContour
 import pickle as pkl
-from pprint import pprint
-import os
 
 TRACING = True  # Enables/disables time tracking
 PIPELINE = True  # Enables/disables multiprocessing
@@ -37,10 +35,10 @@ num = 0 if int(cv2.__version__[0]) >= 4 else 1
 STOP = "stop"
 
 if USE_FIXED_IMG:
-    with open('imaginary_cam_for_real.pkl', 'rb') as f:
+    with open('calibration/imaginary_cam_for_real.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 else:
-    with open('elp_camera.pkl', 'rb') as f:
+    with open('calibration/elp_camera.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 times_dict = {}
@@ -76,7 +74,6 @@ class HexFinder:
     def __init__(self, camera):
         self.camera = camera
         self.img_org = None
-        # self.tasks = [self.capture_video, self.contours, self.filter, self.corners, self.solvepnp]
 
     def update(self):
         got_output, img_org = self.camera.read()
@@ -169,10 +166,6 @@ class HexFinder:
                     p[0] += 20
                     p[1] += 20
                     cv2.drawMarker(img_org, tuple(p), colors[index])
-                # new_points, _ = cv2.projectPoints(HEX_DIMENSIONS, rotation, translation, mtx, dist)
-                # for p in new_points:
-                #     p = (int(np.ndarray.tolist(p)[0][0]), int(np.ndarray.tolist(p)[0][1]))
-                #     cv2.drawMarker(img, p, (0, 0, 255))
         if DISPLAY:
             cv2.imshow("aaa", img_org)
             if cv2.waitKey(5) & 0xFF == ord("q"):
@@ -189,8 +182,7 @@ class HexFinder:
         return processed
 
 
-finder = HexFinder(VirtualCamera(img=cv2.imread("rendered_images/400in_straight2.png")))
-# finder.start()
+finder = HexFinder(VirtualCamera(img=cv2.imread("images/rendered_images/360in10off.png")))
 start = time.time()
 reps = 0
 starting = time.time()
