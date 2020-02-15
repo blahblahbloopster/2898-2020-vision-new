@@ -8,20 +8,13 @@ from EasyContour import EasyContour
 import pickle as pkl
 
 TRACING = True  # Enables/disables time tracking
-PIPELINE = True  # Enables/disables multiprocessing
 USE_FIXED_IMG = True  # Enables/disables using a fixed, rendered image instead of the video
-DISPLAY = False  # Enables/disables displaying debug windows
-
-if PIPELINE:
-    import multiprocessing
-else:
-    import multiprocessing.dummy as multiprocessing
+DISPLAY = True  # Enables/disables displaying debug windows
 
 HEX_DIMENSIONS = [[0, 17],
                   [39.25, 17],
                   [29.437, 0],
                   [9.812, 0]]
-# HEX_DIMENSIONS.reverse()
 XCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[0])[0] / 2
 YCenterOffset = max(HEX_DIMENSIONS, key=lambda x: x[1])[1]
 
@@ -76,12 +69,20 @@ class HexFinder:
         self.img_org = None
 
     def update(self):
+        time_it("read")
         got_output, img_org = self.camera.read()
         img_org = img_org.copy()
+        time_it("read", False)
         if not got_output:
             return STOP
-        hsv = cv2.cvtColor(img_org, cv2.COLOR_RGB2HSV)
-        thresh = cv2.inRange(hsv, (0, 0, 10), (255, 255, 255))
+        # time_it("hsv")
+        # hsv = cv2.cvtColor(img_org, cv2.COLOR_RGB2HSV)
+        # time_it("hsv", False)
+        time_it("thresh")
+        # thresh = cv2.inRange(img_org, (0, 100, 0), (100, 255, 100))
+        gray = cv2.cvtColor(img_org, cv2.COLOR_RGB2GRAY)
+        thresh = cv2.inRange(gray, 50, 255)
+        time_it("thresh", False)
         # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
         # size = 12
         # thresh = cv2.dilate(thresh, (size, size), iterations=1)
@@ -90,10 +91,15 @@ class HexFinder:
             undistort = cv2.undistort(img_org, mtx, dist)
             cv2.imshow("undistort", undistort)
             cv2.imshow("thresh", thresh)
+
+        time_it("contours")
         contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+        time_it("contours", False)
+
         if DISPLAY:
             cv2.drawContours(img_org, contours[num], -1, (255, 0, 0))
             cv2.imshow("contours", img_org)
+        time_it("filter")
         filtered = []
         for cnt in contours:
             # Checks number of points (rough estimation of size)
@@ -120,7 +126,9 @@ class HexFinder:
                 continue
 
             filtered.append(cnt)
+        time_it("filter", False)
         points = []
+        time_it("corners")
         for contour in filtered:
             contour = cv2.approxPolyDP(cv2.convexHull(contour), 5, True)
             center = getCoords(contour)
@@ -142,13 +150,16 @@ class HexFinder:
         for p in points:
             for index, point in enumerate(p):
                 cv2.drawMarker(img_org, point, colors[index])
+        time_it("corners", False)
+        time_it("subpixel")
         subpixels = []
         for corner in points:
             formatted = np.float32(np.reshape(corner, (4, 1, 2)))
             subpix_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.01)
-            gray = cv2.cvtColor(img_org, cv2.COLOR_RGB2GRAY)
             subpixels.append(cv2.cornerSubPix(gray, formatted, (3, 3), (-1, -1), subpix_criteria))
+        time_it("subpixel", False)
 
+        time_it("solvepnp")
         angles = []
         for point in subpixels:
             points2 = np.array(point, dtype=np.float32)
@@ -166,6 +177,7 @@ class HexFinder:
                     p[0] += 20
                     p[1] += 20
                     cv2.drawMarker(img_org, tuple(p), colors[index])
+        time_it("solvepnp", False)
         if DISPLAY:
             cv2.imshow("aaa", img_org)
             if cv2.waitKey(5) & 0xFF == ord("q"):
@@ -187,7 +199,7 @@ start = time.time()
 reps = 0
 starting = time.time()
 try:
-    while time.time() - starting < 10 or not USE_FIXED_IMG:
+    while time.time() - starting < 3 or not USE_FIXED_IMG:
         if reps >= 200:
             time_per_frame = (time.time() - start) / reps
             fps = 1 / time_per_frame
@@ -197,8 +209,24 @@ try:
             start = time.time()
         reps += 1
         gotten = finder.update()
-        print(gotten)
-        # if len(gotten) > 0:
-        #     print("%f in away, %f, %f" % gotten[0])
+        # print(gotten)
 finally:
+    def round_to_places(inp: float, places: int) -> float:
+        return int(inp * (10 ** places)) / (10 ** places)
+
+    def bar(inp: float, chars: int, maximum: float) -> str:
+        inp = (inp / maximum) * chars
+        fullness = " ▏▎▍▌▋▊▉█"
+        closest_fraction = round((inp - int(inp)) * 8)
+        return (int(inp) * fullness[-1]) + fullness[closest_fraction]
+
+    items = list(times_record.items())
+    items.sort(key=lambda x: x[1]["total"], reverse=True)
+    total = sum(map(lambda x: x[1]["total"], items))
+    highest = max(map(lambda x: x[1]["total"], items))
+    print("Name:               Total time (s):")
+    for item in items:
+        print(str(item[0]).ljust(20, " ") +
+              str(round_to_places(item[1]["total"], 4)).ljust(7, " ") +
+              bar(item[1]["total"] / total, 50, highest / total))
     cv2.destroyAllWindows()
