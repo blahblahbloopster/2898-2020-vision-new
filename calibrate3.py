@@ -4,21 +4,22 @@ import os
 import pickle as pkl
 
 
+dir = "images/ps3-camera-calib-0/"
 images = np.asarray([img for img in [
     cv2.cvtColor(
-        cv2.imread('real_imaginary/'+img),
+        cv2.imread(dir+img),
         cv2.COLOR_BGR2GRAY
     )
-    for img in os.listdir('images/real_imaginary/')
+    for img in os.listdir(dir)
 ]])
 
-names = os.listdir("images/real_imaginary")
+names = os.listdir(dir)
 
 termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30000, 0.000001)
-W = 8
-L = 6
+W = 7
+L = 7
 objp = np.zeros((W*L, 3), np.float32)
-objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2) * 0.984
+objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2)
 
 objpoints = []
 imgpoints = []
@@ -42,12 +43,12 @@ for index, img in enumerate(images):
     #    cv2.imshow('img', img)
     #    if cv2.waitKey(1) & 0xFF == ord('q'):
     #        break
-    # cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
 # print(imgpoints)
 # exit()
 ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, images[0].shape[::-1], None, None)
 
-with open('calibration/imaginary_cam_for_real.pkl', 'wb') as f:
+with open('calibration/ps3_cam3.pkl', 'wb') as f:
     pkl.dump([ret, mtx, dist, rvecs, tvecs], f)
 
 print("mtx")

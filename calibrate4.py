@@ -4,12 +4,14 @@ import func_timeout
 import pickle as pkl
 
 cap = cv2.VideoCapture(2)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30000, 0.000001)
-W = 6
-L = 8
+W = 7
+L = 7
 objp = np.zeros((W*L, 3), np.float32)
-objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2) * 0.944
+objp[:, :2] = np.mgrid[0:L, 0:W].T.reshape(-1, 2) * 1
 
 last = False
 

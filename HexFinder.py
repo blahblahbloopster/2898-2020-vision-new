@@ -3,13 +3,13 @@ from math import sqrt
 
 import cv2
 import numpy as np
-from utils import find_extreme_points, compute_output_values, VirtualCamera, getCoords
+from utils import find_extreme_points, compute_output_values, VirtualCamera, getCoords, simplify
 from EasyContour import EasyContour
 import pickle as pkl
 
-TRACING = True  # Enables/disables time tracking
+TRACING = True         # Enables/disables time tracking
 USE_FIXED_IMG = True  # Enables/disables using a fixed, rendered image instead of the video
-DISPLAY = True  # Enables/disables displaying debug windows
+DISPLAY = False        # Enables/disables displaying debug windows
 
 HEX_DIMENSIONS = [[0, 17],
                   [39.25, 17],
@@ -27,11 +27,11 @@ num = 0 if int(cv2.__version__[0]) >= 4 else 1
 
 STOP = "stop"
 
-if USE_FIXED_IMG:
+if USE_FIXED_IMG and False:
     with open('calibration/imaginary_cam_for_real.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 else:
-    with open('calibration/elp_camera.pkl', 'rb') as f:
+    with open('calibration/ps3_cam3.pkl', 'rb') as f:
         ret, mtx, dist, rotation_vectors, translation_vectors = pkl.load(f)
 
 times_dict = {}
@@ -81,7 +81,9 @@ class HexFinder:
         time_it("thresh")
         # thresh = cv2.inRange(img_org, (0, 100, 0), (100, 255, 100))
         gray = cv2.cvtColor(img_org, cv2.COLOR_RGB2GRAY)
-        thresh = cv2.inRange(gray, 50, 255)
+        hsv = cv2.cvtColor(img_org, cv2.COLOR_RGB2HSV)
+        # thresh = cv2.inRange(gray, 50, 255)
+        thresh = cv2.inRange(hsv, (50, 50, 100), (120, 255, 255))
         time_it("thresh", False)
         # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
         # size = 12
@@ -93,11 +95,11 @@ class HexFinder:
             cv2.imshow("thresh", thresh)
 
         time_it("contours")
-        contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+        contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[num]
         time_it("contours", False)
 
         if DISPLAY:
-            cv2.drawContours(img_org, contours[num], -1, (255, 0, 0))
+            cv2.drawContours(img_org, contours, -1, (255, 0, 0))
             cv2.imshow("contours", img_org)
         time_it("filter")
         filtered = []
@@ -130,7 +132,10 @@ class HexFinder:
         points = []
         time_it("corners")
         for contour in filtered:
-            contour = cv2.approxPolyDP(cv2.convexHull(contour), 5, True)
+            # contour = cv2.approxPolyDP(cv2.convexHull(contour), 5, True)
+            contour = simplify(cv2.convexHull(contour), 8)
+            if len(contour) < 4:
+                continue
             center = getCoords(contour)
             unordered = list(map(lambda x: tuple(x[0]), sorted(contour, key=lambda x: sqrt(((x[0][0] - center[0]) ** 2) + ((x[0][1] - center[1]) ** 2)), reverse=True)))
             sort = sorted(unordered, key=lambda x: x[1])
@@ -194,12 +199,16 @@ class HexFinder:
         return processed
 
 
-finder = HexFinder(VirtualCamera(img=cv2.imread("images/rendered_images/360in10off.png")))
+# cam = cv2.VideoCapture(2)
+cam = VirtualCamera(img=cv2.imread("images/67in_angle_ps3.jpg"))
+# cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+# cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+finder = HexFinder(cam)
 start = time.time()
 reps = 0
 starting = time.time()
 try:
-    while time.time() - starting < 3 or not USE_FIXED_IMG:
+    while time.time() - starting < 10 or not USE_FIXED_IMG:
         if reps >= 200:
             time_per_frame = (time.time() - start) / reps
             fps = 1 / time_per_frame
