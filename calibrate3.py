@@ -5,13 +5,17 @@ import pickle as pkl
 
 
 dir = "images/ps3-camera-calib-0/"
-images = np.asarray([img for img in [
-    cv2.cvtColor(
-        cv2.imread(dir+img),
-        cv2.COLOR_BGR2GRAY
-    )
-    for img in os.listdir(dir)
-]])
+# images = np.asarray([img for img in [
+#     cv2.cvtColor(
+#         cv2.imread(dir+img),
+#         cv2.COLOR_BGR2GRAY
+#     )
+#     for img in os.listdir(dir)
+# ]])
+
+images = []
+for img in os.listdir(dir):
+    images.append(cv2.imread(dir + img, 0))
 
 names = os.listdir(dir)
 

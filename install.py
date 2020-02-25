@@ -10,8 +10,12 @@ if os.getuid() != 0:
     exit(1)
 
 os.system("apt update")
-os.system("apt -yqq install python3-pip python3-opencv")
-os.system("git clone https://github.com/blahblahbloopster/2898-2020-vision-new.git /home/pi/")
+os.system("apt clean")
+os.system("apt autoremove")
+
+os.system("apt -yqq install python3-pip python3-opencv git")
+os.system("cd /home/pi/")
+os.system("git clone https://github.com/blahblahbloopster/2898-2020-vision-new.git")
 os.system("cd /home/pi/2898-2020-vision-new/")
 try:
     os.system("pip3 install -r requirements.txt")
@@ -29,5 +33,14 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target""")
 
-os.system("systemctl enable vision.service")
-os.system("systemctl start vision.service")
+
+with open("/lib/systemd/system/load-code.service") as f:
+    f.write("""[Unit]
+Description=Loads 2898's 2020 FRC vision code
+
+[Service]
+Type=oneshot
+ExecStart=/bin/python3 /home/pi/2898-2020-vision-new/update_code.py
+
+[Install]
+WantedBy=multi-user.target""")

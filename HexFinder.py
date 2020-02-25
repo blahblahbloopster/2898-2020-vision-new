@@ -6,10 +6,14 @@ import numpy as np
 from utils import find_extreme_points, compute_output_values, VirtualCamera, getCoords, simplify
 from EasyContour import EasyContour
 import pickle as pkl
+import multiprocessing
+from networktables import NetworkTables
+import logging
 
+logging.basicConfig(level=logging.DEBUG)
 TRACING = True         # Enables/disables time tracking
-USE_FIXED_IMG = True  # Enables/disables using a fixed, rendered image instead of the video
-DISPLAY = False        # Enables/disables displaying debug windows
+USE_FIXED_IMG = False  # Enables/disables using a fixed, rendered image instead of the video
+DISPLAY = True        # Enables/disables displaying debug windows
 
 HEX_DIMENSIONS = [[0, 17],
                   [39.25, 17],
@@ -24,8 +28,6 @@ HEX_DIMENSIONS = EasyContour(HEX_DIMENSIONS)
 HEX_DIMENSIONS = HEX_DIMENSIONS.format([["x", "y", 0], ["x", "y", 0]], np.float32)
 
 num = 0 if int(cv2.__version__[0]) >= 4 else 1
-
-STOP = "stop"
 
 if USE_FIXED_IMG and False:
     with open('calibration/imaginary_cam_for_real.pkl', 'rb') as f:
@@ -67,14 +69,35 @@ class HexFinder:
     def __init__(self, camera):
         self.camera = camera
         self.img_org = None
+        self.camera_queue = multiprocessing.Queue(maxsize=5)
+        self.read_thread = multiprocessing.Process(target=self.read,
+                                                   args=(self.camera_queue,
+                                                         self.camera),
+                                                   daemon=True)
+        self.read_thread.start()
+        # self.network_tables_queue = multiprocessing.Queue(maxsize=5)
+        # self.network_tables_thread = multiprocessing.Process(target=self.push_to_networktables,
+        #                                                      args=(self.camera_queue, ),
+        #                                                      daemon=True)
+        # self.network_tables_thread.start()
+
+    def push_to_networktables(self, inp: multiprocessing.Queue):
+        NetworkTables.initialize("10.28.98.2")
+        sd = NetworkTables.getTable("SmartDashboard")
+        while True:
+            sd.putNumberArray(inp.get())
+
+    def read(self, out: multiprocessing.Queue, camera):
+        while True:
+            out.put(camera.read())
 
     def update(self):
         time_it("read")
-        got_output, img_org = self.camera.read()
+        got_output, img_org = self.camera_queue.get()
         img_org = img_org.copy()
         time_it("read", False)
         if not got_output:
-            return STOP
+            return
         # time_it("hsv")
         # hsv = cv2.cvtColor(img_org, cv2.COLOR_RGB2HSV)
         # time_it("hsv", False)
@@ -83,7 +106,7 @@ class HexFinder:
         gray = cv2.cvtColor(img_org, cv2.COLOR_RGB2GRAY)
         hsv = cv2.cvtColor(img_org, cv2.COLOR_RGB2HSV)
         # thresh = cv2.inRange(gray, 50, 255)
-        thresh = cv2.inRange(hsv, (50, 50, 100), (120, 255, 255))
+        thresh = cv2.inRange(hsv, (45, 110, 90), (90, 255, 255))
         time_it("thresh", False)
         # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
         # size = 12
@@ -105,12 +128,11 @@ class HexFinder:
         filtered = []
         for cnt in contours:
             # Checks number of points (rough estimation of size)
-            if len(cnt) < 100:
+            if len(cnt) < 50:
                 continue
 
             # Checks area
             if cv2.contourArea(cnt) < 100:
-                print("a")
                 continue
 
             # # Checks perimeter/area ratio
@@ -119,7 +141,6 @@ class HexFinder:
 
             # Checks convex hull perimeter / perimeter ratio
             if not 0.6 < cv2.arcLength(cv2.convexHull(cnt), True) / cv2.arcLength(cnt, True) < 0.9:
-                print("b")
                 continue
 
             # Checks if it is too close to the edge
@@ -132,8 +153,8 @@ class HexFinder:
         points = []
         time_it("corners")
         for contour in filtered:
-            # contour = cv2.approxPolyDP(cv2.convexHull(contour), 5, True)
-            contour = simplify(cv2.convexHull(contour), 8)
+            contour = cv2.approxPolyDP(cv2.convexHull(contour), 5, True)
+            # contour = simplify(cv2.convexHull(contour), 8)
             if len(contour) < 4:
                 continue
             center = getCoords(contour)
@@ -186,7 +207,7 @@ class HexFinder:
         if DISPLAY:
             cv2.imshow("aaa", img_org)
             if cv2.waitKey(5) & 0xFF == ord("q"):
-                return STOP
+                return
         return angles
 
     def outside_corners(self, contour):
@@ -199,8 +220,8 @@ class HexFinder:
         return processed
 
 
-# cam = cv2.VideoCapture(2)
-cam = VirtualCamera(img=cv2.imread("images/67in_angle_ps3.jpg"))
+cam = cv2.VideoCapture(2)
+# cam = VirtualCamera(img=cv2.imread("images/67in_angle_ps3.jpg"))
 # cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 # cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 finder = HexFinder(cam)
@@ -218,7 +239,7 @@ try:
             start = time.time()
         reps += 1
         gotten = finder.update()
-        # print(gotten)
+        print(gotten)
 finally:
     def round_to_places(inp: float, places: int) -> float:
         return int(inp * (10 ** places)) / (10 ** places)
