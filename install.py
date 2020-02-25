@@ -21,7 +21,7 @@ try:
     os.system("pip3 install -r requirements.txt")
 except:
     pass
-with open("/lib/systemd/system/vision.service") as f:
+with open("/lib/systemd/system/vision.service", "wt") as f:
     f.write("""[Unit]
 Description=2898's 2020 FRC vision code
 
