@@ -1,6 +1,5 @@
 import time
 from math import sqrt
-
 import cv2
 import numpy as np
 from utils import find_extreme_points, compute_output_values, VirtualCamera, getCoords, simplify
@@ -9,7 +8,10 @@ import pickle as pkl
 import multiprocessing
 from networktables import NetworkTables
 import logging
+import os
 
+# NetworkTables.startClient("10.28.98.2")
+# sd = NetworkTables.getTable("SmartDashboard")
 logging.basicConfig(level=logging.DEBUG)
 TRACING = True         # Enables/disables time tracking
 USE_FIXED_IMG = False  # Enables/disables using a fixed, rendered image instead of the video
@@ -75,17 +77,20 @@ class HexFinder:
                                                          self.camera),
                                                    daemon=True)
         self.read_thread.start()
-        # self.network_tables_queue = multiprocessing.Queue(maxsize=5)
-        # self.network_tables_thread = multiprocessing.Process(target=self.push_to_networktables,
-        #                                                      args=(self.camera_queue, ),
-        #                                                      daemon=True)
-        # self.network_tables_thread.start()
+        self.network_tables_queue = multiprocessing.Queue()
+        self.network_tables_thread = multiprocessing.Process(target=self.push_to_networktables,
+                                                             args=(self.network_tables_queue, ),
+                                                             daemon=True)
+        self.network_tables_thread.start()
 
     def push_to_networktables(self, inp: multiprocessing.Queue):
         NetworkTables.initialize("10.28.98.2")
         sd = NetworkTables.getTable("SmartDashboard")
         while True:
-            sd.putNumberArray(inp.get())
+            g = inp.get()
+            if len(g) > 0:
+                sd.putNumberArray("angles", g[0])
+                NetworkTables.flush()
 
     def read(self, out: multiprocessing.Queue, camera):
         while True:
@@ -106,12 +111,12 @@ class HexFinder:
         gray = cv2.cvtColor(img_org, cv2.COLOR_RGB2GRAY)
         hsv = cv2.cvtColor(img_org, cv2.COLOR_RGB2HSV)
         # thresh = cv2.inRange(gray, 50, 255)
-        thresh = cv2.inRange(hsv, (45, 110, 90), (90, 255, 255))
+        thresh = cv2.inRange(hsv, (60, 70, 30), (90, 255, 250))
         time_it("thresh", False)
         # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
-        # size = 12
-        # thresh = cv2.dilate(thresh, (size, size), iterations=1)
-        # thresh = cv2.erode(thresh, (size, size), iterations=1)
+        size = 12
+        thresh = cv2.dilate(thresh, (size, size), iterations=1)
+        thresh = cv2.erode(thresh, (size, size), iterations=1)
         if DISPLAY:
             undistort = cv2.undistort(img_org, mtx, dist)
             cv2.imshow("undistort", undistort)
@@ -145,7 +150,9 @@ class HexFinder:
 
             # Checks if it is too close to the edge
             extreme_points = find_extreme_points(cnt)
-            if extreme_points[0][0] < 10 or extreme_points[1][0] > 1070:
+            if extreme_points[0][0] < 10 or extreme_points[1][0] > 630:
+                continue
+            if extreme_points[2][1] < 50:
                 continue
 
             filtered.append(cnt)
@@ -208,6 +215,8 @@ class HexFinder:
             cv2.imshow("aaa", img_org)
             if cv2.waitKey(5) & 0xFF == ord("q"):
                 return
+        # self.network_tables_queue.empty()
+        self.network_tables_queue.put(angles, timeout=0.01)
         return angles
 
     def outside_corners(self, contour):
@@ -220,6 +229,16 @@ class HexFinder:
         return processed
 
 
+commands = [
+            "v4l2-ctl --set-ctrl=white_balance_automatic=0 -d%s",
+            "v4l2-ctl --set-ctrl=auto_exposure=1 -d%s",
+            "v4l2-ctl --set-ctrl=exposure=4 -d%s",
+            "v4l2-ctl --set-ctrl=gain_automatic=0 -d%s",
+            "v4l2-ctl --set-ctrl=gain=0 -d%s"
+]
+for c in commands:
+    os.system(c % 2)
+time.sleep(1)
 cam = cv2.VideoCapture(2)
 # cam = VirtualCamera(img=cv2.imread("images/67in_angle_ps3.jpg"))
 # cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
