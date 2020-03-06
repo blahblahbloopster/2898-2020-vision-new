@@ -77,22 +77,28 @@ class HexFinder:
                                                          self.camera),
                                                    daemon=True)
         self.read_thread.start()
+        NetworkTables.initialize("10.28.98.2")
+        self.sd = NetworkTables.getTable("SmartDashboard")
         self.network_tables_queue = multiprocessing.Queue()
         self.network_tables_thread = multiprocessing.Process(target=self.push_to_networktables,
                                                              args=(self.network_tables_queue, ),
                                                              daemon=True)
         self.network_tables_thread.start()
 
+    def push_angles(self, angles):
+        self.sd.putNumber("distance", angles[0])
+        self.sd.putNumber("angle1", angles[1])
+        self.sd.putNumber("angle2", angles[2])
+        self.sd.putNumberArray("angles", angles)
+        NetworkTables.flush()
+
     def push_to_networktables(self, inp: multiprocessing.Queue):
-        NetworkTables.initialize("10.28.98.2")
-        sd = NetworkTables.getTable("SmartDashboard")
         while True:
             g = inp.get()
             if len(g) > 0:
-                sd.putNumberArray("angles", g[0])
-                NetworkTables.flush()
+                self.push_angles(g[0])
             else:
-                sd.putNumberArray("angles", (-1, -1, -1))
+                self.push_angles((-1, -1, -1))
                 NetworkTables.flush()
 
     def read(self, out: multiprocessing.Queue, camera):
