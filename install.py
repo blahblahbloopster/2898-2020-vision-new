@@ -4,10 +4,14 @@ required code, sets up the python environment, and creates a systemd
 service to start it on boot.
 """
 import os
+# import subprocess
 
 if os.getuid() != 0:
     print("You must run this program as root! (run sudo !!)")
     exit(1)
+
+# print(subprocess.run("ping -w1 fijweifjewi.com", shell=True).returncode)
+# exit()
 
 os.system("apt update")
 os.system("apt clean")
@@ -24,3 +28,4 @@ except:
 os.system('echo "[Unit]\nDescription=2898\'s 2020 FRC vision code\n\n[Service]\n'
           'Type=simple\nExecStart=/bin/python3 /home/pi/2898-2020-vision-new/HexFinder.py\n'
           'Restart=on-failure\n\n[Install]\nWantedBy=multi-user.target" >> /lib/systemd/system/vision.service')
+os.system("systemctl enable vision.service")

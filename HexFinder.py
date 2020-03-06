@@ -91,6 +91,9 @@ class HexFinder:
             if len(g) > 0:
                 sd.putNumberArray("angles", g[0])
                 NetworkTables.flush()
+            else:
+                sd.putNumberArray("angles", (-1, -1, -1))
+                NetworkTables.flush()
 
     def read(self, out: multiprocessing.Queue, camera):
         while True:
@@ -102,6 +105,7 @@ class HexFinder:
         img_org = img_org.copy()
         time_it("read", False)
         if not got_output:
+            self.network_tables_queue.put((-1, -1, -1))
             return
         # time_it("hsv")
         # hsv = cv2.cvtColor(img_org, cv2.COLOR_RGB2HSV)
