@@ -121,7 +121,7 @@ class HexFinder:
         gray = cv2.cvtColor(img_org, cv2.COLOR_RGB2GRAY)
         hsv = cv2.cvtColor(img_org, cv2.COLOR_RGB2HSV)
         # thresh = cv2.inRange(gray, 50, 255)
-        thresh = cv2.inRange(hsv, (60, 70, 30), (90, 255, 250))
+        thresh = cv2.inRange(hsv, (0, 20, 30), (90, 255, 255))
         time_it("thresh", False)
         # thresh = cv2.inRange(self.img_org, (0, 60, 0), (175, 255, 200))
         size = 12
@@ -170,6 +170,7 @@ class HexFinder:
         points = []
         time_it("corners")
         for contour in filtered:
+            print(contour)
             contour = cv2.approxPolyDP(cv2.convexHull(contour), 5, True)
             # contour = simplify(cv2.convexHull(contour), 8)
             if len(contour) < 4:
